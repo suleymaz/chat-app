@@ -120,3 +120,14 @@ sayılıyor, normal kullanıcı etkilenmiyor.
 **Kullanıcı yanıtlarında publicUserSelect kullanılıyor.**
 Prisma varsayılan olarak tüm kolonları döndürdüğü için passwordHash'in yanıta sızmaması
 adına tek bir select nesnesi tanımlandı.
+
+**girisKontrol middleware'i her istekte veritabanına gidiyor.**
+Token'daki sub alanı kullanıcı ID'sini zaten taşıyor, ancak silinmiş kullanıcıların
+tespiti ve req.user içinde güncel profil bilgisine (isOnline, notificationPreview)
+erişim için sorgu yapılıyor. JWT'nin stateless avantajından kısmen vazgeçilen bilinçli
+bir takas.
+
+**TOKEN_EXPIRED ve INVALID_TOKEN ayrı kodlar döndürüyor.**
+Flutter tarafındaki interceptor TOKEN_EXPIRED durumunda sessizce refresh yapıp isteği
+tekrarlayacak; INVALID_TOKEN durumunda kullanıcıyı giriş ekranına yönlendirecek. Ayrım
+yapılmasaydı bozuk bir token sonsuz refresh döngüsüne yol açabilirdi.

@@ -82,3 +82,41 @@ eski sürümü çalışır tutabilmek için eklendi.
 
 **console.log yerine Winston logger.**
 Seviye ayrımı (debug/info/warn/error), zaman damgası ve dosyaya yazma için.
+
+
+## Gün 3 — Kimlik Doğrulama
+
+**Access token (15dk) ve refresh token (7 gün) ayrımı.**
+Access token her istekte kullanıldığı için stateless doğrulanıyor — veritabanına gidilmiyor,
+bu yüzden iptal edilemiyor. Kısa ömür, çalınma durumunda hasarı sınırlıyor. Refresh token
+ise veritabanında tutulduğu için iptal edilebiliyor; uzun ömrü kullanıcının sürekli giriş
+yapmasını engelliyor.
+
+**Refresh token rotation.**
+Her yenilemede eski token iptal edilip yenisi veriliyor.
+
+**Reuse detection.**
+İptal edilmiş bir refresh token tekrar kullanılırsa, token'ın sızdığı varsayılıp o
+kullanıcının tüm refresh token'ları iptal ediliyor. Hangi tarafın saldırgan olduğu
+bilinemediği için zincirin tamamı kesiliyor; kullanıcı yeniden giriş yapıyor.
+
+**Refresh token'lar veritabanında hash'lenerek saklanıyor (SHA-256).**
+Veritabanı sızıntısında token'ların doğrudan kullanılabilir olmaması için. Parolada bcrypt
+kullanılırken burada SHA-256 tercih edildi: token zaten yüksek entropili ve rastgele,
+bcrypt'in kasıtlı yavaşlığına ihtiyaç yok.
+
+**Login hataları ayrıştırılmıyor.**
+Kullanıcı bulunamadığında da parola hatalı olduğunda da aynı mesaj dönüyor
+(INVALID_CREDENTIALS). Farklı mesajlar, sistemde hangi e-postaların kayıtlı olduğunu
+öğrenmeye (user enumeration) izin verirdi.
+
+**Rate limiting auth endpoint'lerinde uygulanıyor.**
+15 dakikada 10 istek. skipSuccessfulRequests: true ile yalnızca başarısız denemeler
+sayılıyor, normal kullanıcı etkilenmiyor.
+
+**Parola politikası: min 8 karakter, büyük/küçük harf ve rakam zorunlu.**
+Üst sınır 72 karakter — bcrypt bundan uzun girdileri sessizce kesiyor.
+
+**Kullanıcı yanıtlarında publicUserSelect kullanılıyor.**
+Prisma varsayılan olarak tüm kolonları döndürdüğü için passwordHash'in yanıta sızmaması
+adına tek bir select nesnesi tanımlandı.

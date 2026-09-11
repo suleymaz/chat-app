@@ -131,3 +131,32 @@ bir takas.
 Flutter tarafındaki interceptor TOKEN_EXPIRED durumunda sessizce refresh yapıp isteği
 tekrarlayacak; INVALID_TOKEN durumunda kullanıcıyı giriş ekranına yönlendirecek. Ayrım
 yapılmasaydı bozuk bir token sonsuz refresh döngüsüne yol açabilirdi.
+
+**Başkasının profilinde e-posta ve telefon gizleniyor.**
+Kendi profilinde (publicUserSelect) dönen bu alanlar, başkasının profilinde
+(findProfileById) dönmüyor. Arama kriteri olmalarıyla çelişmiyor: kullanıcıyı e-postasıyla
+arayabilirsin ama sonuçta e-postasını göremezsin.
+
+**Arama davranışı alan bazında farklı.**
+username ve fullName için kısmi eşleşme (contains), email ve phone için tam eşleşme
+(equals). Kısmi e-posta araması, sistemdeki adresleri parça parça keşfetmeye izin verirdi.
+
+**Engelleme çift yönlü etki gösteriyor.**
+Ali Ayşe'yi engellediyse, Ayşe de Ali'yi arama sonuçlarında göremiyor ve profiline
+erişemiyor. Tek yönlü olsaydı engellenen kişi engelleyeni izlemeye devam ederdi.
+
+**Engellenen kullanıcının profili 404 dönüyor, 403 değil.**
+"Bu kullanıcı sizi engelledi" mesajı vermek, engellenme bilgisini karşı tarafa açık
+ederdi. Kullanıcı hiç yokmuş gibi davranılıyor.
+
+**Şifre değişiminde tüm refresh token'lar iptal ediliyor.**
+Şifre değiştirme genellikle bir güvenlik endişesinden kaynaklandığı için, başka
+cihazlarda açık kalmış oturumların devam etmemesi gerekiyor.
+
+**E-posta ve telefon güncellemesi kapsam dışı.**
+Bu alanlar kimlik doğrulama kimliği olduğu için değiştirilmeleri doğrulama akışı
+(e-postaya/SMS'e kod gönderme) gerektirir. Proje kapsamında bu akış geliştirilmedi.
+
+**Route sıralaması: /me/blocked ve /search, /:id'den önce tanımlandı.**
+Express route'ları sırayla eşleştirdiği için, /:id önce gelseydi "search" bir id olarak
+yorumlanırdı.

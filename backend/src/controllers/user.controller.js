@@ -18,7 +18,7 @@ export const changePassword = asyncHandler(async (req, res) => {
 });
 
 export const searchUsers = asyncHandler(async (req, res) => {
-  const sonuclar = await userService.searchUsers(req.user.id, req.query);
+  const sonuclar = await userService.searchUsers(req.user.id, req.validatedQuery ?? req.query);
   success(res, sonuclar);
 });
 

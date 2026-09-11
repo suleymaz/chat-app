@@ -6,6 +6,8 @@ import { erisimKontrol } from "./conversation.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
 import crypto from "crypto";
+import * as emitters from "../sockets/emitters.js";
+import { kullaniciBagliMi } from "../config/socket.js";
 
 // Silinmis mesajlarin icerigi istemciye gonderilmez
 const mesajTemizle = (mesaj) => {
@@ -53,13 +55,16 @@ export const gonder = async (userId, conversationId, { content }) => {
 
   const engelli = await blockRepo.engelVarMi(userId, karsiTaraf.userId);
 
-  // Engelli durumda mesaj kaydedilmez, gonderene basarili yanit doner
   if (engelli) {
     logger.info(`Engelli kullaniciya mesaj gonderme denemesi: ${userId} -> ${karsiTaraf.userId}`);
     return sahteMessaj({ conversationId, senderId: userId, content });
   }
 
-  return messageRepo.mesajOlustur({ conversationId, senderId: userId, content });
+  const mesaj = await messageRepo.mesajOlustur({ conversationId, senderId: userId, content });
+
+  await mesajIletimi(mesaj, karsiTaraf.userId, userId);
+
+  return mesaj;
 };
 
 // Yeni sohbet baslatir ve ilk mesaji gonderir
@@ -94,6 +99,8 @@ export const yeniSohbetBaslat = async (userId, { userId: aliciId, content }) => 
       content,
     });
 
+    await mesajIletimi(mesaj, aliciId, userId);
+
     return { conversationId: mevcut.id, message: mesaj };
   }
 
@@ -102,6 +109,8 @@ export const yeniSohbetBaslat = async (userId, { userId: aliciId, content }) => 
     aliciId,
     content,
   });
+
+  await mesajIletimi(mesaj, aliciId, userId);
 
   return { conversationId: sohbet.id, message: mesaj };
 };
@@ -113,14 +122,25 @@ export const sil = async (userId, messageId) => {
     throw ApiError.notFound("Mesaj bulunamadi", "MESSAGE_NOT_FOUND");
   }
 
-  // Sadece kendi mesajini silebilir
   if (mesaj.senderId !== userId) {
     throw ApiError.forbidden("Sadece kendi mesajlarinizi silebilirsiniz", "NOT_MESSAGE_OWNER");
   }
 
   await erisimKontrol(mesaj.conversationId, userId);
 
-  return messageRepo.softDelete(messageId);
+  const silinmis = await messageRepo.softDelete(messageId);
+
+  const sohbet = await conversationRepo.findById(mesaj.conversationId);
+  const karsiTaraf = sohbet.participants.find((k) => k.userId !== userId);
+
+  if (karsiTaraf) {
+    emitters.mesajSilindiYayinla(karsiTaraf.userId, {
+      conversationId: mesaj.conversationId,
+      messageId,
+    });
+  }
+
+  return silinmis;
 };
 
 export const ara = async (userId, conversationId, { q, limit = 20 }) => {
@@ -145,4 +165,22 @@ function sahteMessaj({ conversationId, senderId, content }) {
     createdAt: new Date(),
     attachments: [],
   };
+}
+
+// Mesaji aliciya iletir, alici bagliysa iletildi olarak isaretler
+async function mesajIletimi(mesaj, aliciId, gonderenId) {
+  emitters.yeniMesajYayinla(aliciId, mesaj);
+
+  // Alici cevrimiciyse mesaj hemen iletilmis sayilir
+  if (kullaniciBagliMi(aliciId)) {
+    const iletilmeZamani = new Date();
+
+    await messageRepo.iletildiIsaretle(mesaj.conversationId, aliciId);
+
+    emitters.iletildiYayinla(gonderenId, {
+      conversationId: mesaj.conversationId,
+      messageIds: [mesaj.id],
+      deliveredAt: iletilmeZamani,
+    });
+  }
 }

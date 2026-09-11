@@ -3,6 +3,7 @@ import * as messageRepo from "../repositories/message.repository.js";
 import * as blockRepo from "../repositories/block.repository.js";
 import * as userRepo from "../repositories/user.repository.js";
 import { ApiError } from "../utils/ApiError.js";
+import * as emitters from "../sockets/emitters.js";
 
 // Kullanicinin sohbete erisim yetkisi var mi kontrol eder
 const erisimKontrol = async (conversationId, userId) => {
@@ -98,6 +99,19 @@ export const okunduIsaretle = async (userId, conversationId) => {
 
   await conversationRepo.okunduIsaretle(conversationId, userId);
   await messageRepo.okunduIsaretle(conversationId, userId);
+
+
+  // Karsi tarafa mesajlarinin okundugunu bildir
+  const sohbet = await conversationRepo.findById(conversationId);
+  const karsiTaraf = sohbet.participants.find((k) => k.userId !== userId);
+
+  if (karsiTaraf) {
+    emitters.okunduYayinla(karsiTaraf.userId, {
+      conversationId,
+      readAt: new Date(),
+    });
+  }
+
 };
 
 export const arsivle = async (userId, conversationId, archived) => {

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Socket Test</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 20px auto; padding: 0 16px; }
+    input, button { padding: 8px; font-size: 14px; }
+    input[type="text"] { width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+    #log { background: #111; color: #0f0; padding: 12px; height: 400px; overflow-y: auto;
+           font-family: monospace; font-size: 12px; white-space: pre-wrap; margin-top: 16px; }
+    .row { margin-bottom: 8px; }
+    .durum { padding: 6px 12px; border-radius: 4px; display: inline-block; }
+    .bagli { background: #d4edda; color: #155724; }
+    .kopuk { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h2>Socket.IO Test</h2>
+
+  <div class="row">
+    <input type="text" id="token" placeholder="Access token yapistir">
+  </div>
+  <div class="row">
+    <button onclick="baglan()">Baglan</button>
+    <button onclick="kopar()">Kopar</button>
+    <span id="durum" class="durum kopuk">Bagli degil</span>
+  </div>
+
+  <hr>
+
+  <div class="row">
+    <input type="text" id="conversationId" placeholder="Conversation ID (yaziyor testi icin)">
+  </div>
+  <div class="row">
+    <button onclick="odayaKatil()">Odaya katil</button>
+    <button onclick="yaziyorBaslat()">Yaziyor baslat</button>
+    <button onclick="yaziyorBitir()">Yaziyor bitir</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    let socket = null;
+
+    function yaz(mesaj, veri) {
+      const log = document.getElementById("log");
+      const saat = new Date().toLocaleTimeString();
+      log.textContent += `[${saat}] ${mesaj}`;
+      if (veri !== undefined) {
+        log.textContent += " " + JSON.stringify(veri, null, 2);
+      }
+      log.textContent += "\n";
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function durumGuncelle(bagli) {
+      const el = document.getElementById("durum");
+      el.textContent = bagli ? "Bagli" : "Bagli degil";
+      el.className = "durum " + (bagli ? "bagli" : "kopuk");
+    }
+
+    function baglan() {
+      const token = document.getElementById("token").value.trim();
+
+      if (!token) {
+        alert("Token gerekli");
+        return;
+      }
+
+      socket = io("http://localhost:5000", { auth: { token } });
+
+      socket.on("connect", () => {
+        yaz("BAGLANDI - socket id: " + socket.id);
+        durumGuncelle(true);
+      });
+
+      socket.on("connect_error", (err) => {
+        yaz("BAGLANTI HATASI: " + err.message);
+        durumGuncelle(false);
+      });
+
+      socket.on("disconnect", (sebep) => {
+        yaz("BAGLANTI KOPTU: " + sebep);
+        durumGuncelle(false);
+      });
+
+      socket.on("message:new", (mesaj) => yaz("YENI MESAJ", mesaj));
+      socket.on("message:delivered", (veri) => yaz("ILETILDI", veri));
+      socket.on("message:read", (veri) => yaz("OKUNDU", veri));
+      socket.on("message:deleted", (veri) => yaz("MESAJ SILINDI", veri));
+      socket.on("typing", (veri) => yaz("YAZIYOR", veri));
+      socket.on("user:online", (veri) => yaz("CEVRIMICI", veri));
+      socket.on("user:offline", (veri) => yaz("CEVRIMDISI", veri));
+    }
+
+    function kopar() {
+      if (socket) socket.disconnect();
+    }
+
+    function odayaKatil() {
+      const id = document.getElementById("conversationId").value.trim();
+      socket.emit("conversation:join", { conversationId: id });
+      yaz("Odaya katildim: " + id);
+    }
+
+    function yaziyorBaslat() {
+      const id = document.getElementById("conversationId").value.trim();
+      socket.emit("typing:start", { conversationId: id });
+      yaz("typing:start gonderildi");
+    }
+
+    function yaziyorBitir() {
+      const id = document.getElementById("conversationId").value.trim();
+      socket.emit("typing:stop", { conversationId: id });
+      yaz("typing:stop gonderildi");
+    }
+  </script>
+</body>
+</html>

@@ -132,6 +132,9 @@ Flutter tarafındaki interceptor TOKEN_EXPIRED durumunda sessizce refresh yapıp
 tekrarlayacak; INVALID_TOKEN durumunda kullanıcıyı giriş ekranına yönlendirecek. Ayrım
 yapılmasaydı bozuk bir token sonsuz refresh döngüsüne yol açabilirdi.
 
+
+## Gün 4 — Kullanıcı İşlemleri
+
 **Başkasının profilinde e-posta ve telefon gizleniyor.**
 Kendi profilinde (publicUserSelect) dönen bu alanlar, başkasının profilinde
 (findProfileById) dönmüyor. Arama kriteri olmalarıyla çelişmiyor: kullanıcıyı e-postasıyla
@@ -160,3 +163,64 @@ Bu alanlar kimlik doğrulama kimliği olduğu için değiştirilmeleri doğrulam
 **Route sıralaması: /me/blocked ve /search, /:id'den önce tanımlandı.**
 Express route'ları sırayla eşleştirdiği için, /:id önce gelseydi "search" bir id olarak
 yorumlanırdı.
+
+
+## Gün 5 — Sohbetler ve Mesajlar
+Sohbet listesini çekerken N+1 problemine düşmemek için Prisma'nın include özelliğini
+kullandım. Her sohbetin son mesajını `take: 1` ile aynı sorguda alıyorum. Okunmamış sayısı
+için ayrı sorgu atmak zorunda kaldım çünkü Prisma'nın _count özelliği "şu tarihten sonrası"
+gibi koşullu sayımı desteklemiyor. Bunları Promise.all ile paralel çalıştırdım.
+
+Mesaj listesinde offset yerine cursor pagination kullandım. Offset ile sayfa çekerken yeni
+mesaj gelirse tüm kayıtlar kayıyor ve aynı mesajı iki kez görebiliyorsun. Cursor'da
+referans noktası sabit olduğu için bu olmuyor. Cursor olarak createdAt kullandım.
+
+hasMore bilgisini doğru vermek için limitten bir fazla kayıt çekiyorum. Önce "gelen sayı
+limite eşitse devamı var" diye yazmıştım ama son sayfada tam limit kadar kayıt olduğunda
+yanlış sonuç veriyordu — kullanıcı boşuna bir istek daha atıyordu.
+
+Mesaj gönderirken sohbet oluşturma, mesaj ekleme ve lastMessageAt güncelleme işlemlerini
+transaction içine aldım. Ortada birinde hata olursa yarım kayıt kalmasın diye.
+
+Engelli kullanıcıya mesaj gönderildiğinde mesajı veritabanına yazmıyorum ama gönderene
+başarılı yanıt dönüyorum. Kaydetseydim engel kalktığında eski mesajlar birden ortaya
+çıkardı. Karşı tarafa engellendiği bilgisini vermemek için de hata dönmüyorum.
+
+Sohbet silme kişiye özel — ConversationParticipant.deletedAt dolduruluyor, sohbetin
+kendisi silinmiyor. Karşı taraf sohbeti görmeye devam ediyor. Arşivleme de aynı mantıkta.
+
+Mesaj silmede önce sahiplik kontrolü yapıyorum (403), sohbete erişim kontrolünü sonra.
+Sahiplik kontrolü daha ucuz olduğu için önce o çalışsın istedim. Burada 404 yerine 403
+döndüm çünkü kullanıcı mesajı zaten görebiliyor, varlığını gizlemenin anlamı yok.
+
+Express 4'te req.query salt okunur olduğu için Zod'un dönüştürdüğü değerler kullanılmıyordu
+— limit parametresi string olarak gidiyor ve Prisma hata veriyordu. Doğrulanmış query
+değerlerini req.validatedQuery içinde tutup controller'da oradan okuyacak şekilde
+düzelttim.
+
+
+## Gün 6 — Socket.IO
+
+Socket auth'u handshake sırasında yapıyorum. Bağlantı kurulurken token geliyor, doğrulanıyor
+ve socket nesnesine userId yazılıyor. Bağlantı kurulduktan sonra kimlik bir daha
+sorgulanmıyor.
+
+İki tür room kullandım. user:<userId> odasına kullanıcı bağlandığında otomatik katılıyor —
+birden fazla cihazdan bağlanmış olabileceği için tek bir socket'e değil odaya yayın yapmak
+gerekiyor. conversation:<id> odasına ise sohbet ekranı açıkken katılıyor, "yazıyor"
+göstergesi gibi sadece o ekranda anlamlı olan event'ler için.
+
+Mesaj gönderme işlemini socket üzerinden değil REST ile yapıyorum. Socket sadece mesajı
+karşı tarafa iletmek için kullanılıyor. Böylece validation, hata yönetimi ve HTTP status
+kodları tek yerde kalıyor; socket bağlantısı kopmuş olsa bile mesaj gönderilebiliyor.
+
+Çevrimiçi durumu için bağlantı sayacı tuttum. Kullanıcı iki cihazdan bağlıysa sayaç 2
+oluyor, biri kapanınca 1'e düşüyor ama kullanıcı hâlâ çevrimiçi sayılıyor. Sayaç sıfıra
+inince offline yapılıyor ve lastSeenAt güncelleniyor.
+
+kullaniciBagliMi fonksiyonu iki işe yarıyor: alıcı bağlıysa mesaj hemen "iletildi" olarak
+işaretleniyor, ayrıca FCM bildirimi gönderilip gönderilmeyeceğine bu bilgiye göre karar
+verilecek.
+
+Test için basit bir HTML sayfası yazdım (socket-test.html). Postman socket testine uygun
+olmadığı için iki tarayıcı sekmesinde iki kullanıcıyla bağlanıp event akışını izledim.

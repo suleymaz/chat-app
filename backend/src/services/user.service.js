@@ -4,6 +4,7 @@ import * as tokenRepo from "../repositories/refreshToken.repository.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
 import { ApiError } from "../utils/ApiError.js";
 import logger from "../utils/logger.js";
+import * as fileService from "./file.service.js";
 
 export const getMyProfile = async (userId) => {
   const kullanici = await userRepo.findById(userId);
@@ -117,4 +118,34 @@ export const getBlockedUsers = async (userId) => {
     ...k.blocked,
     blockedAt: k.createdAt,
   }));
+};
+
+
+export const avatarGuncelle = async (userId, dosya) => {
+  const bilgi = await fileService.gorselIsle(dosya.path, { maxGenislik: 512, kalite: 85 });
+  const url = fileService.urlUret("avatars", dosya.filename);
+
+  const eskiKullanici = await userRepo.findById(userId);
+
+  const guncel = await userRepo.update(userId, { avatarUrl: url });
+
+  // Eski avatari diskten sil
+  if (eskiKullanici?.avatarUrl) {
+    await fileService.dosyaSil(eskiKullanici.avatarUrl);
+  }
+
+  logger.info(`Avatar guncellendi: userId=${userId}, ${bilgi.width}x${bilgi.height}`);
+
+  return guncel;
+};
+
+export const avatarSil = async (userId) => {
+  const kullanici = await userRepo.findById(userId);
+
+  if (!kullanici?.avatarUrl) {
+    throw ApiError.notFound("Profil fotografi bulunamadi", "NO_AVATAR");
+  }
+
+  await fileService.dosyaSil(kullanici.avatarUrl);
+  return userRepo.update(userId, { avatarUrl: null });
 };

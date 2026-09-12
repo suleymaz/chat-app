@@ -2,6 +2,8 @@ import { Router } from "express";
 import * as userController from "../controllers/user.controller.js";
 import { girisKontrol } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validate.js";
+import { avatarUpload, uploadHandler } from "../middlewares/upload.js";
+
 import {
   updateProfileSchema,
   changePasswordSchema,
@@ -21,6 +23,10 @@ router.patch("/me/password", validate(changePasswordSchema), userController.chan
 
 // Engellenen kullanicilar - /:id'den once tanimlanmali
 router.get("/me/blocked", userController.getBlockedUsers);
+
+// Profil fotografi
+router.post("/me/avatar", uploadHandler(avatarUpload), userController.avatarYukle);
+router.delete("/me/avatar", userController.avatarSil);
 
 // Kullanici arama
 router.get("/search", validate(searchSchema), userController.searchUsers);

@@ -3,6 +3,7 @@ import * as conversationController from "../controllers/conversation.controller.
 import * as messageController from "../controllers/message.controller.js";
 import { girisKontrol } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validate.js";
+import { mesajGorseliUpload, uploadHandler, mesajDosyasiUpload } from "../middlewares/upload.js";
 import {
   sohbetBaslatSchema,
   conversationIdSchema,
@@ -31,6 +32,8 @@ router.patch("/:id/archive", validate(arsivSchema), conversationController.arsiv
 // Sohbet icindeki mesajlar
 router.get("/:id/messages", validate(mesajListeSchema), messageController.listele);
 router.post("/:id/messages", validate(mesajGonderSchema), messageController.gonder);
+router.post("/:id/messages/image", uploadHandler(mesajGorseliUpload), messageController.gorselGonder);
+router.post("/:id/messages/file", uploadHandler(mesajDosyasiUpload), messageController.dosyaGonder);
 router.get("/:id/messages/search", validate(mesajAraSchema), messageController.ara);
 
 export default router;

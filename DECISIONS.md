@@ -224,3 +224,56 @@ verilecek.
 
 Test için basit bir HTML sayfası yazdım (socket-test.html). Postman socket testine uygun
 olmadığı için iki tarayıcı sekmesinde iki kullanıcıyla bağlanıp event akışını izledim.
+
+## Gün 7 — Dosya Yükleme ve Bildirimler
+
+Dosyaları sunucu diskinde tutuyorum, uploads/ klasöründe. S3 gibi bir nesne deposu daha
+doğru olurdu ama hesap ve API anahtarı gerektirdiği için projeyi klonlayan biri
+çalıştıramazdı. Üretimde buranın değişmesi gerekir. file.service.js'i bir soyutlama
+katmanı olarak yazdım, depolama stratejisi değişirse sadece o dosyaya dokunmak yeterli.
+
+Yüklenen dosyanın orijinal adını kullanmıyorum. Zaman damgası + rastgele hex ile yeni ad
+üretiyorum — hem çakışma olmuyor hem de "../../" gibi bir adla dosya sistemine sızma
+riski kalmıyor. Dosya eklerinde orijinal adı Attachment.fileName alanında saklıyorum,
+kullanıcı dosyayı kendi adıyla görsün diye.
+
+Görselleri sharp ile yeniden boyutlandırıp sıkıştırıyorum. Avatar için 512px, mesaj
+görselleri için 1280px. rotate() çağrısı önemli: telefonla çekilen fotoğraflarda EXIF
+yönlendirme bilgisi oluyor, uygulanmazsa görsel yan yatıyor.
+
+Dosya eklerini de kapsama aldım. Doküman 8. maddede "Dosya ve Görsel Gönderimi" diyor;
+örnekler görsel üzerine ama başlık ikisini de kapsıyor. MessageType enum'una FILE ekledim.
+Görsel ve dosya için ayrı boyut limiti var: görselde 5 MB, dosyada 20 MB. Görseller zaten
+sıkıştırıldığı için 5 MB yeterli, dosyalarda sıkıştırma yapılmıyor.
+
+Dosya yükleme endpoint'lerini /files altında toplamak yerine ilgili kaynağın altına koydum
+(/users/me/avatar, /conversations/:id/messages/image, /conversations/:id/messages/file).
+Böylece dosya bağlamsız yüklenip sonra ilişkilendirilmiyor, doğrudan ait olduğu yere
+gidiyor.
+
+Firebase'i opsiyonel yaptım. serviceAccountKey.json yoksa bildirimler devre dışı kalıyor
+ama uygulama normal çalışıyor. Böylece Firebase hesabı olmayan biri de projeyi
+çalıştırabiliyor. Veritabanı olmadan uygulama çalışamaz, orada çökmek doğru — ama bildirim
+gönderememek mesajlaşmayı engellemiyor.
+
+Bildirim gönderilip gönderilmeyeceğine socket bağlantı durumuna bakarak karar veriyorum.
+Kullanıcı bağlıysa mesajı zaten görüyor, bildirim göndermek gereksiz. Bağlı değilse FCM
+devreye giriyor.
+
+Bildirim içeriği maskeleme sunucu tarafında yapılıyor. notificationPreview ayarı NONE veya
+NAME_ONLY ise mesaj içeriği FCM'e hiç gönderilmiyor. İçeriği gönderip istemcide gizlemek
+sahte bir gizlilik olurdu — veri zaten Google'ın sunucularından geçmiş olurdu.
+
+Geçersiz FCM token'ları her gönderimde tespit edip siliyorum. Kullanıcı uygulamayı
+silince token geçersiz oluyor, temizlenmezse tablo şişerdi.
+
+helmet'in crossOriginResourcePolicy ayarını cross-origin yaptım. Varsayılan ayar
+yüklenen görsellerin başka bir origin'den (Flutter uygulaması) yüklenmesini engelliyordu.
+
+app.js'de statik dosya servisini notFoundHandler'dan sonra tanımlamıştım, /uploads
+istekleri 404 dönüyordu. Middleware sırası önemli — 404 ve hata yakalayıcılar her zaman
+en sonda olmalı.
+
+Attachment tablosuna fileName eklerken şemayı kaydetmeden migration çalıştırmışım,
+"Already in sync" dedi ama Prisma Client alanı tanımıyordu. Şemayı kaydedip tekrar
+çalıştırınca düzeldi.

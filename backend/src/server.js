@@ -4,6 +4,7 @@ import { env } from "./config/env.js";
 import prisma from "./config/database.js";
 import logger from "./utils/logger.js";
 import { initSocket } from "./config/socket.js";
+import { initFirebase } from "./config/firebase.js";
 
 const httpServer = http.createServer(app);
 
@@ -24,6 +25,8 @@ const shutdown = async (signal) => {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+initFirebase();
+initSocket(httpServer);
 
 process.on("unhandledRejection", (reason) => {
   logger.error("Yakalanmamis promise reddi", { reason });

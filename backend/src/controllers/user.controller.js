@@ -41,3 +41,13 @@ export const getBlockedUsers = asyncHandler(async (req, res) => {
   const liste = await userService.getBlockedUsers(req.user.id);
   success(res, liste);
 });
+
+export const avatarYukle = asyncHandler(async (req, res) => {
+  const kullanici = await userService.avatarGuncelle(req.user.id, req.file);
+  success(res, kullanici);
+});
+
+export const avatarSil = asyncHandler(async (req, res) => {
+  const kullanici = await userService.avatarSil(req.user.id);
+  success(res, kullanici);
+});

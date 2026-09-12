@@ -14,6 +14,7 @@ export const mesajSelect = {
     select: {
       id: true,
       url: true,
+      fileName: true,
       mimeType: true,
       sizeBytes: true,
       width: true,
@@ -118,4 +119,37 @@ export const mesajAra = ({ conversationId, terim, limit }) =>
     select: mesajSelect,
     orderBy: { createdAt: "desc" },
     take: limit,
+  });
+
+
+  // Gorsel mesaji - mesaj ve eki tek transaction icinde olusturulur
+// Ekli mesaj olusturur - gorsel veya dosya
+export const ekliMesajOlustur = ({ conversationId, senderId, content, type, ek }) =>
+  prisma.$transaction(async (tx) => {
+    const mesaj = await tx.message.create({
+      data: {
+        conversationId,
+        senderId,
+        content: content || null,
+        type,
+        attachments: {
+          create: {
+            url: ek.url,
+            fileName: ek.fileName ?? null,
+            mimeType: ek.mimeType,
+            sizeBytes: ek.sizeBytes,
+            width: ek.width ?? null,
+            height: ek.height ?? null,
+          },
+        },
+      },
+      select: mesajSelect,
+    });
+
+    await tx.conversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: mesaj.createdAt },
+    });
+
+    return mesaj;
   });

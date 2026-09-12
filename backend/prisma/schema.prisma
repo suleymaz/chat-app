@@ -10,6 +10,7 @@ datasource db {
 enum MessageType {
   TEXT
   IMAGE
+  FILE
 }
 
 enum NotificationPreview {
@@ -131,6 +132,7 @@ model Attachment {
   id        String   @id @default(uuid())
   messageId String
   url       String
+  fileName  String?
   mimeType  String
   sizeBytes Int
   width     Int?

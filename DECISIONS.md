@@ -277,3 +277,39 @@ en sonda olmalı.
 Attachment tablosuna fileName eklerken şemayı kaydetmeden migration çalıştırmışım,
 "Already in sync" dedi ama Prisma Client alanı tanımıyordu. Şemayı kaydedip tekrar
 çalıştırınca düzeldi.
+
+
+## Gün 8 — Flutter Kurulumu
+
+State management için Riverpod seçtim. Provider'a göre derleme zamanında daha fazla hata
+yakalıyor ve BuildContext gerektirmiyor. Bloc daha yapılandırılmış ama bu ölçekte fazla
+boilerplate getiriyordu.
+
+Routing için go_router kullandım. Asıl sebebi redirect özelliği: auth guard'ı tek yerden
+yönetebiliyorum, her ekranda ayrı ayrı "giriş yapılmış mı" kontrolü yazmaya gerek kalmıyor.
+
+API adresini String.fromEnvironment ile yapılandırılabilir bıraktım. Build sırasında
+--dart-define=API_URL=... ile değiştirilebiliyor. Emülatörde 10.0.2.2, fiziksel cihazda
+bilgisayarın yerel IP'si gerekiyor; deploy edilirse de aynı yerden değişecek.
+
+Dio interceptor'ında token yenileme kuyruğu kurdum. Access token süresi dolunca 401
+geliyor, interceptor bunu yakalayıp refresh yapıyor ve isteği tekrarlıyor — kullanıcı
+hiçbir şey görmüyor. Kritik nokta şu: paralel beş istek aynı anda 401 alırsa beş ayrı
+refresh gitmemeli, çünkü backend'de rotation var ve ilki diğerlerini geçersiz kılardı.
+Bir bayrakla ilk refresh'i işaretleyip kalanları kuyruğa alıyorum.
+
+Refresh isteği için ayrı bir Dio örneği kullanıyorum. Aynı örneği kullansaydım interceptor
+tekrar devreye girip sonsuz döngü olurdu.
+
+validateStatus'u 500'ün altını geçirecek şekilde ayarladım. Böylece 4xx yanıtlarını
+onResponse içinde yakalayıp kendi ApiException tipime çevirebiliyorum.
+
+Backend'in details dizisini alanHatalari haritasına çeviriyorum, form alanlarının altına
+hata yazarken kullanacağım.
+
+Derleme sırasında üç sorunla uğraştım: NDK eksikti (Android Studio SDK Manager'dan
+kurdum), flutter_local_notifications core library desugaring istedi (build.gradle.kts'e
+ekledim), ve file_picker eski compileSdk ile geliyordu. Sonuncusu için android/
+build.gradle.kts içinde tüm alt projelerin compileSdk'sını 36'ya sabitleyen bir subprojects
+bloğu yazdım. Bu bloğu evaluationDependsOn satırından önce koymak gerekiyor, sonra
+koyduğumda "project is already evaluated" hatası verdi.

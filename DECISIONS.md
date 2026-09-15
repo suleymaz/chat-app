@@ -313,3 +313,22 @@ ekledim), ve file_picker eski compileSdk ile geliyordu. Sonuncusu için android/
 build.gradle.kts içinde tüm alt projelerin compileSdk'sını 36'ya sabitleyen bir subprojects
 bloğu yazdım. Bu bloğu evaluationDependsOn satırından önce koymak gerekiyor, sonra
 koyduğumda "project is already evaluated" hatası verdi.
+
+## Gün 9 — Giriş ve Kayıt Ekranları
+
+Form doğrulamasını iki katmanlı yaptım. İstemci tarafında anında uyarı veriyorum —
+kullanıcı sunucuya gitmeden hatayı görüyor. Sunucu tarafı yine de gerekli çünkü istemci
+doğrulaması atlanabilir, ayrıca "bu kullanıcı adı alınmış" bilgisini sadece sunucu bilir.
+
+Backend'in döndüğü alan bazlı hataları ilgili input'un altında gösteriyorum. VALIDATION_ERROR
+durumunda details dizisi geliyor, USERNAME_TAKEN gibi durumlarda ise hata kodundan hangi
+alan olduğunu çıkarıyorum.
+
+Bir noktada takıldım: interceptor hatayı DioException içine sarıp ApiException'ı error
+alanına koyuyor. Ekranda "on ApiException catch" yazınca yakalanmıyordu, hep genel hata
+mesajı çıkıyordu. "on DioException catch" yapıp e.error'ı kontrol ederek çözdüm. Daha temiz
+çözüm interceptor'ın doğrudan ApiException fırlatması olurdu, sonra bakacağım.
+
+Ortak widget'lar yazdım (AppTextField, AppButton, HataKutusu) — her formda aynı stili
+tekrar yazmamak için. AppTextField şifre alanlarında göster/gizle butonunu kendi içinde
+hallediyor.

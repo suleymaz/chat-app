@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
+import '../models/user_model.dart';
 
 class MesajSayfasi {
   final List<MessageModel> mesajlar;
@@ -137,4 +138,11 @@ class ChatRepository {
   Future<void> sohbetSil(String conversationId) async {
     await _client.dio.delete('/conversations/$conversationId');
   }
+
+    Future<UserModel> sohbetDetay(String conversationId) async {
+    final yanit = await _client.dio.get('/conversations/$conversationId');
+    final veri = yanit.data['data'];
+    return UserModel.fromJson(veri['user'] as Map<String, dynamic>);
+  }
 }
+

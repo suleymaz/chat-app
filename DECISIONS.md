@@ -355,3 +355,34 @@ görünürdü.
 
 Boş liste durumunda RefreshIndicator'ın çalışması için Stack içine boş bir ListView koymak
 gerekiyor. Kaydırılabilir alan olmadan pull-to-refresh tetiklenmiyor.
+
+
+## Gün 11 — Mesajlaşma Ekranı
+
+Optimistic UI kullandım. Kullanıcı gönder'e basınca mesaj anında ekranda beliriyor, sunucu
+yanıtı beklenmiyor. Bunu mümkün kılan şey UUID kararı — mesaj id'sini istemci kendi
+üretebiliyor. Yanıt gelince geçici mesaj gerçeğiyle değiştiriliyor, hata olursa kırmızı
+ünlem ve yenile butonu çıkıyor.
+
+MessageModel'e yerelDurum diye bir alan koydum. Sadece istemcide kullanılıyor, sunucudan
+gelmiyor. Gönderiliyor ve başarısız durumlarını taşıyor.
+
+Liste reverse: true ile ters çiziliyor. Mesajlaşmada en yeni mesaj altta olmalı ve liste
+altta açılmalı. Bunun sonucu olarak "yukarı kaydırma" maxScrollExtent'e yaklaşmak demek
+oluyor, eski mesajları yükleme kontrolü ona göre yazıldı.
+
+Gün ayracı da ters mantıkla çalışıyor: bir mesajın kendisinden sonraki (yani daha eski)
+mesajla günü farklıysa ayraç koyuyorum. Ters listede bu, ayracın o günün üstünde
+görünmesini sağlıyor.
+
+mesajProvider'ı family olarak yazdım, her sohbetin kendi mesaj listesi var. Başta
+autoDispose koymamıştım — sohbetten çıkıp girince notifier bellekte kaldığı için yeni
+mesajlar görünmüyordu. autoDispose ekleyince her girişte sıfırdan yükleniyor.
+
+Yeni sohbet akışı için conversationId yerine "yeni" değeri kullanıyorum, karşı tarafın
+id'si query parametresiyle geliyor. İlk mesaj gönderildiğinde sohbet backend'de oluşuyor
+ve dönen id notifier'a yazılıyor.
+
+Android 9'dan itibaren şifrelenmemiş HTTP istekleri varsayılan olarak engelleniyor.
+Görseller yüklenmiyordu, AndroidManifest'e usesCleartextTraffic="true" eklemek gerekti.
+Üretimde HTTPS kullanılacağı için bu kaldırılmalı.

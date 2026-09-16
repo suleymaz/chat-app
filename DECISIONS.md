@@ -332,3 +332,26 @@ mesajı çıkıyordu. "on DioException catch" yapıp e.error'ı kontrol ederek �
 Ortak widget'lar yazdım (AppTextField, AppButton, HataKutusu) — her formda aynı stili
 tekrar yazmamak için. AppTextField şifre alanlarında göster/gizle butonunu kendi içinde
 hallediyor.
+
+
+## Gün 10 — Sohbet Listesi ve Arama
+
+Sohbet listesini ekran içinde setState ile tutmak yerine Riverpod provider'ına aldım.
+Sebebi: liste üç yerden değişecek — ilk yükleme, pull-to-refresh, ve yarın ekleyeceğim
+socket olayları. Socket katmanının ekranın state'ine erişmesi mümkün olmazdı.
+
+AsyncValue kullanıyorum, loading/data/error üçünü tek tipte taşıyor. Ekranda when ile
+üçünü de ele alabiliyorum, doküman 10. maddede istenen durumlar bunlar.
+
+yukle() ve tazele() diye iki ayrı metot yazdım. İlki loading durumuna geçiyor ve ekranı
+boşaltıyor, ikincisi mevcut listeyi ekranda tutup arka planda güncelliyor. Pull-to-refresh'te
+listenin kaybolup geri gelmesi kötü görünürdü.
+
+Aramada debounce var, 400ms. Kullanıcı "ahmet" yazarken her harfte istek atmıyorum, yazmayı
+bıraktıktan sonra tek istek gidiyor.
+
+Avatar rengini baş harflerden üretiyorum. Rastgele olsa aynı kişi her açılışta farklı renkte
+görünürdü.
+
+Boş liste durumunda RefreshIndicator'ın çalışması için Stack içine boş bir ListView koymak
+gerekiyor. Kaydırılabilir alan olmadan pull-to-refresh tetiklenmiyor.

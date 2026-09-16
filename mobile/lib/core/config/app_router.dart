@@ -6,12 +6,18 @@ import '../../presentation/screens/splash_screen.dart';
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../presentation/screens/auth/register_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
+import '../../presentation/screens/search/search_screen.dart';
+import '../../presentation/screens/chat/chat_screen.dart';
+import '../../presentation/screens/profile/profile_screen.dart';
 
 class Rotalar {
   static const splash = '/';
   static const login = '/login';
   static const register = '/register';
   static const home = '/home';
+  static const search = '/search';
+  static const chat = '/chat';
+  static const profile = '/profile';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -23,19 +29,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       final durum = authState.durum;
       final yol = state.matchedLocation;
 
-      // Oturum kontrolu tamamlanana kadar splash'te bekle
       if (durum == OturumDurumu.baslangic) {
         return yol == Rotalar.splash ? null : Rotalar.splash;
       }
 
       final authEkraninda = yol == Rotalar.login || yol == Rotalar.register;
 
-      // Giris yapilmamissa auth ekranlarina yonlendir
       if (durum == OturumDurumu.girisYapilmadi) {
         return authEkraninda ? null : Rotalar.login;
       }
 
-      // Giris yapilmissa auth ekranlarindan uzaklastir
       if (authEkraninda || yol == Rotalar.splash) {
         return Rotalar.home;
       }
@@ -58,6 +61,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Rotalar.home,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: Rotalar.search,
+        builder: (context, state) => const SearchScreen(),
+      ),
+      GoRoute(
+        path: Rotalar.profile,
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '${Rotalar.chat}/:id',
+        builder: (context, state) => ChatScreen(
+          conversationId: state.pathParameters['id']!,
+          userId: state.uri.queryParameters['userId'],
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

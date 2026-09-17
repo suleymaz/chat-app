@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../core/config/app_config.dart';
 import '../../core/storage/secure_storage.dart';
@@ -60,6 +61,10 @@ class SocketService {
   io.Socket? _socket;
   bool _baglaniyor = false;
 
+  // socket.connected baglanti kurulduktan hemen sonra yanlis sonuc verebiliyor,
+  // durumu kendi bayragimizla takip ediyoruz
+  bool _bagliMi = false;
+
   final _yeniMesaj = StreamController<YeniMesajOlayi>.broadcast();
   final _iletildi = StreamController<IletildiOlayi>.broadcast();
   final _okundu = StreamController<OkunduOlayi>.broadcast();
@@ -76,23 +81,28 @@ class SocketService {
   Stream<DurumOlayi> get durum => _durum.stream;
   Stream<bool> get baglantiDurumu => _baglantiDurumu.stream;
 
-  bool get bagli => _socket?.connected ?? false;
+  bool get bagli => _bagliMi;
 
   // Token yenileme icin disaridan verilen fonksiyon
   Future<bool> Function()? tokenYenile;
 
   Future<void> baglan() async {
-    // Zaten bagli veya baglanma surecindeyse tekrar deneme
     if (_baglaniyor) return;
-    if (_socket != null && _socket!.connected) return;
+    if (_bagliMi) return;
 
     _baglaniyor = true;
 
     try {
-      final token = await SecureStorage.accessTokenAl();
-      if (token == null) {
-        _baglaniyor = false;
-        return;
+      var token = await SecureStorage.accessTokenAl();
+      if (token == null) return;
+
+      // Token suresi dolmussa once yenile, yoksa socket auth basarisiz oluyor
+      if (_tokenSuresiDolmus(token)) {
+        final yenilendi = await tokenYenile?.call() ?? false;
+        if (!yenilendi) return;
+
+        token = await SecureStorage.accessTokenAl();
+        if (token == null) return;
       }
 
       _socket?.dispose();
@@ -119,30 +129,64 @@ class SocketService {
     }
   }
 
+  // JWT payload'indaki exp alanini okuyup suresi dolmus mu bakar
+  bool _tokenSuresiDolmus(String token) {
+    try {
+      final parcalar = token.split('.');
+      if (parcalar.length != 3) return true;
+
+      final cozulmus = utf8.decode(base64Url.decode(base64Url.normalize(parcalar[1])));
+      final veri = jsonDecode(cozulmus) as Map<String, dynamic>;
+
+      final exp = veri['exp'] as int?;
+      if (exp == null) return true;
+
+      final sonKullanma = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+
+      // 10 saniye pay birakiyoruz
+      return DateTime.now().isAfter(sonKullanma.subtract(const Duration(seconds: 10)));
+    } catch (_) {
+      return true;
+    }
+  }
+
   void _dinleyicileriKur() {
     final socket = _socket;
     if (socket == null) return;
 
     socket.onConnect((_) {
+      _bagliMi = true;
       _baglantiDurumu.add(true);
     });
 
     socket.onDisconnect((_) {
+      _bagliMi = false;
       _baglantiDurumu.add(false);
     });
 
     socket.onConnectError((hata) async {
+      _bagliMi = false;
       _baglantiDurumu.add(false);
 
       // Token suresi dolmus olabilir - yenileyip tekrar dene
-      final mesaj = hata.toString().toLowerCase();
-      if (mesaj.contains('token') || mesaj.contains('jwt')) {
-        final yenilendi = await tokenYenile?.call() ?? false;
-        if (yenilendi) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          await baglan();
-        }
+      final yenilendi = await tokenYenile?.call() ?? false;
+      if (yenilendi) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        await baglan();
       }
+    });
+
+    // Sunucu yeniden baslatildiginda otomatik yeniden baglanma tukenebiliyor,
+    // o durumda sifirdan baglaniyoruz
+    socket.onReconnectFailed((_) async {
+      _bagliMi = false;
+      await Future.delayed(const Duration(seconds: 3));
+      await baglan();
+    });
+
+    socket.onReconnectError((_) {
+      _bagliMi = false;
+      _baglantiDurumu.add(false);
     });
 
     socket.on('message:new', (veri) {
@@ -217,15 +261,24 @@ class SocketService {
     _socket?.emit('typing:stop', {'conversationId': conversationId});
   }
 
+  // Cikis yapildiginda cagriliyor - yeniden baglanma denemeleri de durur
   void kopar() {
-    _socket?.disconnect();
-    _socket?.dispose();
+    final socket = _socket;
     _socket = null;
+    _bagliMi = false;
+
+    if (socket != null) {
+      socket.clearListeners();
+      socket.disconnect();
+      socket.dispose();
+    }
+
     _baglantiDurumu.add(false);
   }
 
   void temizle() {
     _socket?.dispose();
     _socket = null;
+    _bagliMi = false;
   }
 }

@@ -20,14 +20,12 @@ class ApiClient {
         connectTimeout: AppConfig.baglantiSuresi,
         receiveTimeout: AppConfig.yanitSuresi,
         headers: {'Content-Type': 'application/json'},
-        validateStatus: (status) => status != null && status < 500,
       ),
     );
 
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: _istekOncesi,
-        onResponse: _yanitSonrasi,
         onError: _hataDurumunda,
       ),
     );
@@ -47,39 +45,6 @@ class ApiClient {
     }
 
     handler.next(options);
-  }
-
-  void _yanitSonrasi(Response response, ResponseInterceptorHandler handler) {
-    final durum = response.statusCode ?? 500;
-
-    // validateStatus 500'un altini gecirdigi icin 4xx'leri burada yakaliyoruz
-    if (durum >= 400) {
-      final hata = _hataCevir(response);
-
-      // 401 ve token suresi dolmussa yenileme akisina girecek
-      if (durum == 401 && _yenilenebilirMi(response)) {
-        handler.reject(
-          DioException(
-            requestOptions: response.requestOptions,
-            response: response,
-            type: DioExceptionType.badResponse,
-          ),
-        );
-        return;
-      }
-
-      handler.reject(
-        DioException(
-          requestOptions: response.requestOptions,
-          response: response,
-          error: hata,
-          type: DioExceptionType.badResponse,
-        ),
-      );
-      return;
-    }
-
-    handler.next(response);
   }
 
   bool _yenilenebilirMi(Response response) {
@@ -135,6 +100,7 @@ class ApiClient {
     handler.reject(
       DioException(
         requestOptions: err.requestOptions,
+        response: err.response,
         error: err.response != null
             ? _hataCevir(err.response!)
             : ApiException(message: 'Beklenmeyen bir hata olustu', code: 'UNKNOWN'),
@@ -142,7 +108,7 @@ class ApiClient {
     );
   }
 
-  Future<void> _tokenYenileVeTekrarla(DioException err, ErrorInterceptorHandler handler) async {
+    Future<void> _tokenYenileVeTekrarla(DioException err, ErrorInterceptorHandler handler) async {
     // Baska bir istek zaten yeniliyorsa kuyruga al
     if (_yenileniyor) {
       _bekleyenler.add((options: err.requestOptions, handler: handler));
@@ -165,11 +131,9 @@ class ApiClient {
 
       final veri = yanit.data['data'];
       await SecureStorage.tokenKaydet(
-        accessToken: veri['accessToken'],
-        refreshToken: veri['refreshToken'],
+        accessToken: veri['accessToken'] as String,
+        refreshToken: veri['refreshToken'] as String,
       );
-
-      _yenileniyor = false;
 
       // Basarisiz olan istegi tekrarla
       await _istegiTekrarla(err.requestOptions, handler);
@@ -182,8 +146,10 @@ class ApiClient {
         await _istegiTekrarla(bekleyen.options, bekleyen.handler);
       }
     } catch (_) {
-      _yenileniyor = false;
       await _oturumuKapat(err, handler);
+    } finally {
+      // Ne olursa olsun bayrak sifirlanmali, yoksa sonraki yenilemeler takilir
+      _yenileniyor = false;
     }
   }
 

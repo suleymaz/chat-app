@@ -18,6 +18,6 @@ export const refresh = asyncHandler(async (req, res) => {
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  await authService.logout(req.body.refreshToken);
+  await authService.logout(req.body.refreshToken, req.user?.id);
   noContent(res);
 });

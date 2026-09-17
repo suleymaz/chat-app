@@ -105,7 +105,11 @@ export const refresh = async (refreshToken) => {
   return { user, ...tokens };
 };
 
-export const logout = async (refreshToken) => {
+export const logout = async (refreshToken, userId) => {
+  if (userId) {
+    await userRepo.update(userId, { isOnline: false, lastSeenAt: new Date() });
+  }
+
   if (!refreshToken) return;
 
   const stored = await tokenRepo.findByHash(hashToken(refreshToken));

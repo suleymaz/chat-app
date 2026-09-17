@@ -73,6 +73,9 @@ const baglantiKur = async (socket) => {
     await userRepo.update(userId, { isOnline: true });
     socket.broadcast.emit("user:online", { userId });
     logger.info(`Kullanici cevrimici: ${username}`);
+
+    // Cevrimdisiyken gelen mesajlar simdi iletilmis sayilir
+    await bekleyenMesajlariIlet(userId);
   }
 
   // Sohbet odasina katilma - yaziyor gostergesi icin
@@ -140,3 +143,50 @@ export const kullaniciBagliMi = (userId) => bagliKullanicilar.has(userId);
 
 // Bir kullanicinin acik socket id'leri
 export const kullaniciSocketIdleri = (userId) => kullaniciSocketleri.get(userId) ?? [];
+
+// Kullanici baglandiginda, o bagli degilken gelen mesajlari iletildi olarak isaretler
+const bekleyenMesajlariIlet = async (userId) => {
+  const { default: prisma } = await import("./database.js");
+  const emitters = await import("../sockets/emitters.js");
+
+  // Kullanicinin katildigi sohbetlerdeki, baskasindan gelen ve henuz iletilmemis mesajlar
+  const bekleyenler = await prisma.message.findMany({
+    where: {
+      deliveredAt: null,
+      senderId: { not: userId },
+      conversation: {
+        participants: { some: { userId } },
+      },
+    },
+    select: { id: true, conversationId: true, senderId: true },
+  });
+
+  if (bekleyenler.length === 0) return;
+
+  const simdi = new Date();
+
+  await prisma.message.updateMany({
+    where: { id: { in: bekleyenler.map((m) => m.id) } },
+    data: { deliveredAt: simdi },
+  });
+
+  // Gonderenlere haber ver - sohbet bazinda gruplayip tek olay gonderiyoruz
+  const gonderenBazinda = new Map();
+
+  for (const mesaj of bekleyenler) {
+    const anahtar = `${mesaj.senderId}|${mesaj.conversationId}`;
+    const mevcut = gonderenBazinda.get(anahtar) ?? [];
+    gonderenBazinda.set(anahtar, [...mevcut, mesaj.id]);
+  }
+
+  for (const [anahtar, messageIds] of gonderenBazinda) {
+    const [gonderenId, conversationId] = anahtar.split("|");
+    emitters.iletildiYayinla(gonderenId, {
+      conversationId,
+      messageIds,
+      deliveredAt: simdi,
+    });
+  }
+
+  logger.info(`${bekleyenler.length} bekleyen mesaj iletildi olarak isaretlendi: ${userId}`);
+};

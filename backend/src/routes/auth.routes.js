@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as authController from "../controllers/auth.controller.js";
 import { validate } from "../middlewares/validate.js";
 import { authLimiter } from "../middlewares/rateLimit.js";
+import { girisKontrol } from "../middlewares/auth.middleware.js";
 import {
   registerSchema,
   loginSchema,
@@ -22,5 +23,8 @@ router.post("/refresh", validate(refreshSchema), authController.refresh);
 
 // Cikis: refresh token iptal edilir
 router.post("/logout", validate(logoutSchema), authController.logout);
+
+// Cikis: refresh token iptal edilir
+router.post("/logout", girisKontrol, validate(logoutSchema), authController.logout);
 
 export default router;

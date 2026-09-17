@@ -10,11 +10,27 @@ import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/sohbet_satiri.dart';
 import '../../providers/socket_provider.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Ekran acildiginda listeyi tazele - giris sonrasi ilk yukleme
+    // auth tamamlanmadan yapilmis olabiliyor
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(sohbetListesiProvider.notifier).tazele();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sohbetler = ref.watch(sohbetListesiProvider);
     final benimId = ref.watch(authProvider).kullanici?.id ?? '';
     final kullanici = ref.watch(authProvider).kullanici;

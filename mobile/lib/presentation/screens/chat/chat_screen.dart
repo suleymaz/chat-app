@@ -1,20 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/tarih_formatla.dart';
+import '../../../data/datasources/socket_service.dart';
 import '../../../data/models/message_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/message_provider.dart';
+import '../../providers/socket_provider.dart';
 import '../../widgets/gun_ayraci.dart';
 import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/mesaj_balonu.dart';
-import 'package:flutter/services.dart';
-import 'dart:async';
-import '../../providers/socket_provider.dart';
 import '../../widgets/yaziyor_gostergesi.dart';
-
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -32,8 +32,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   UserModel? _karsiTaraf;
   bool _karsiTarafYukleniyor = true;
-    Timer? _yaziyorZamanlayici;
+  Timer? _yaziyorZamanlayici;
   bool _yaziyorGonderildi = false;
+
+  // dispose sirasinda ref kullanilamadigi icin servisi burada tutuyoruz
+  late final SocketService _socketServis;
 
   // "yeni" ise henuz sohbet olusmamis demektir
   bool get _yeniSohbet => widget.conversationId == 'yeni';
@@ -44,9 +47,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         benimId: ref.read(authProvider).kullanici?.id ?? '',
       );
 
-    @override
+  @override
   void initState() {
     super.initState();
+
+    _socketServis = ref.read(socketServiceProvider);
     _scrollController.addListener(_kaydirmaDinle);
     _mesajController.addListener(_yazmaDinle);
 
@@ -54,19 +59,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _karsiTarafiYukle();
 
       if (!_yeniSohbet) {
-        ref.read(socketServiceProvider).sohbeteKatil(widget.conversationId);
+        _socketServis.sohbeteKatil(widget.conversationId);
         ref.read(mesajProvider(_param).notifier).okunduIsaretle();
         ref.read(sohbetListesiProvider.notifier).okunduIsaretle(widget.conversationId);
       }
     });
   }
 
-    @override
+  @override
   void dispose() {
     if (!_yeniSohbet) {
-      ref.read(socketServiceProvider).sohbettenAyril(widget.conversationId);
+      _socketServis.sohbettenAyril(widget.conversationId);
       if (_yaziyorGonderildi) {
-        ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+        _socketServis.yaziyorBitir(widget.conversationId);
       }
     }
 
@@ -86,7 +91,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-    // Kullanici yazarken karsi tarafa bildirim gonderir
+  // Kullanici yazarken karsi tarafa bildirim gonderir
   void _yazmaDinle() {
     if (_yeniSohbet) return;
 
@@ -94,7 +99,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (bosMu) {
       if (_yaziyorGonderildi) {
-        ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+        _socketServis.yaziyorBitir(widget.conversationId);
         _yaziyorGonderildi = false;
       }
       _yaziyorZamanlayici?.cancel();
@@ -102,7 +107,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     if (!_yaziyorGonderildi) {
-      ref.read(socketServiceProvider).yaziyorBaslat(widget.conversationId);
+      _socketServis.yaziyorBaslat(widget.conversationId);
       _yaziyorGonderildi = true;
     }
 
@@ -110,7 +115,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _yaziyorZamanlayici?.cancel();
     _yaziyorZamanlayici = Timer(const Duration(seconds: 2), () {
       if (_yaziyorGonderildi) {
-        ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+        _socketServis.yaziyorBitir(widget.conversationId);
         _yaziyorGonderildi = false;
       }
     });
@@ -119,14 +124,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _karsiTarafiYukle() async {
     try {
       if (_yeniSohbet && widget.userId != null) {
-        final kullanici = await ref.read(userRepositoryProvider).kullaniciGetir(widget.userId!);
+        final kullanici =
+            await ref.read(userRepositoryProvider).kullaniciGetir(widget.userId!);
         if (mounted) setState(() => _karsiTaraf = kullanici);
       } else {
-        final detay = await ref.read(chatRepositoryProvider).sohbetDetay(widget.conversationId);
+        final detay =
+            await ref.read(chatRepositoryProvider).sohbetDetay(widget.conversationId);
         if (mounted) setState(() => _karsiTaraf = detay);
       }
     } catch (_) {
-      // Karsi taraf yuklenemezse baslikta id gosterilir
+      // Karsi taraf yuklenemezse baslikta varsayilan metin gosterilir
     } finally {
       if (mounted) setState(() => _karsiTarafYukleniyor = false);
     }
@@ -138,8 +145,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     _mesajController.clear();
 
-        if (_yaziyorGonderildi) {
-      ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+    if (_yaziyorGonderildi) {
+      _socketServis.yaziyorBitir(widget.conversationId);
       _yaziyorGonderildi = false;
     }
     _yaziyorZamanlayici?.cancel();
@@ -148,13 +155,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     _enAltaKaydir();
 
-    // Yeni sohbet olustuysa listeyi tazele
-    final notifier = ref.read(mesajProvider(_param).notifier);
-    if (_yeniSohbet && notifier.olusanSohbetId != null) {
-      ref.read(sohbetListesiProvider.notifier).tazele();
-    } else {
-      ref.read(sohbetListesiProvider.notifier).tazele();
-    }
+    ref.read(sohbetListesiProvider.notifier).tazele();
   }
 
   void _enAltaKaydir() {
@@ -216,13 +217,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     final durum = ref.watch(mesajProvider(_param));
     final benimId = ref.watch(authProvider).kullanici?.id ?? '';
     final yaziyor = ref.watch(yaziyorProvider)[widget.conversationId] ?? false;
 
-    // Sohbet ekrani acikken gelen mesajlari okundu isaretle
+    // Sohbet ekrani acikken gelen mesajlar hemen okundu isaretlenir
     ref.listen(mesajProvider(_param), (onceki, yeni) {
       final oncekiSayi = onceki?.mesajlar.length ?? 0;
       if (yeni.mesajlar.length > oncekiSayi && !_yeniSohbet) {
@@ -245,7 +246,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-    PreferredSizeWidget _baslik(bool yaziyor) {
+  PreferredSizeWidget _baslik(bool yaziyor) {
     final cevrimiciHarita = ref.watch(cevrimiciProvider);
     final cevrimici = _karsiTaraf != null
         ? (cevrimiciHarita[_karsiTaraf!.id] ?? _karsiTaraf!.isOnline)

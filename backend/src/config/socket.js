@@ -8,13 +8,22 @@ let io = null;
 // Bagli kullanicilarin socket sayilari - coklu cihaz destegi icin
 const bagliKullanicilar = new Map();
 
+// userId -> socket id listesi. Room yerine dogrudan socket'e yayin yapiyoruz
+const kullaniciSocketleri = new Map();
+
 export const initSocket = (httpServer) => {
-  io = new Server(httpServer, {
+  if (io) {
+    logger.warn("Socket.IO zaten baslatilmis, tekrar baslatilmiyor");
+    return io;
+  }
+
+    io = new Server(httpServer, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"],
     },
     pingTimeout: 60000,
+    transports: ["websocket"],
   });
 
   // Baglanti kurulmadan once token dogrulanir
@@ -54,6 +63,8 @@ const baglantiKur = async (socket) => {
 
   socket.join(`user:${userId}`);
 
+  const mevcutSoketler = kullaniciSocketleri.get(userId) ?? [];
+  kullaniciSocketleri.set(userId, [...mevcutSoketler, socket.id]);
   const oncekiSayi = bagliKullanicilar.get(userId) ?? 0;
   bagliKullanicilar.set(userId, oncekiSayi + 1);
 
@@ -94,7 +105,15 @@ const baglantiKur = async (socket) => {
     });
   });
 
-  socket.on("disconnect", async () => {
+  socket.on("disconnect", async (sebep) => {
+    const soketler = (kullaniciSocketleri.get(userId) ?? []).filter((id) => id !== socket.id);
+
+    if (soketler.length === 0) {
+      kullaniciSocketleri.delete(userId);
+    } else {
+      kullaniciSocketleri.set(userId, soketler);
+    }
+
     const kalanSayi = (bagliKullanicilar.get(userId) ?? 1) - 1;
 
     if (kalanSayi <= 0) {
@@ -118,3 +137,6 @@ export const getIO = () => {
 
 // Kullanici su an bagli mi - FCM gonderilip gonderilmeyecegine karar vermek icin
 export const kullaniciBagliMi = (userId) => bagliKullanicilar.has(userId);
+
+// Bir kullanicinin acik socket id'leri
+export const kullaniciSocketIdleri = (userId) => kullaniciSocketleri.get(userId) ?? [];

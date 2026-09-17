@@ -52,7 +52,10 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
   // Yeni sohbet ilk mesajla olustugunda id buraya yazilir
   String? olusanSohbetId;
 
-      MesajNotifier({
+  // Mesaj listeye yerlesmeden once gelen iletildi bilgileri burada bekler
+  final Map<String, DateTime> _bekleyenIletildi = {};
+
+  MesajNotifier({
     required ChatRepository repo,
     required this.conversationId,
     required this.karsiTarafId,
@@ -193,10 +196,16 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
   }
 
   void _mesajiDegistir(String eskiId, MessageModel yeni) {
+    // Bu mesaj icin iletildi bilgisi onceden geldiyse simdi uygula
+    final bekleyenTarih = _bekleyenIletildi.remove(yeni.id);
+    final guncel = bekleyenTarih != null && yeni.deliveredAt == null
+        ? yeni.copyWith(deliveredAt: bekleyenTarih)
+        : yeni;
+
     state = state.copyWith(
       mesajlar: [
         for (final m in state.mesajlar)
-          if (m.id == eskiId) yeni else m,
+          if (m.id == eskiId) guncel else m,
       ],
     );
   }
@@ -206,6 +215,55 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
       mesajlar: [
         for (final m in state.mesajlar)
           if (m.id == mesajId) m.copyWith(yerelDurum: durum) else m,
+      ],
+    );
+  }
+
+  // Socket'ten gelen yeni mesaji listeye ekler
+  void mesajEkle(MessageModel mesaj) {
+    // Zaten varsa tekrar ekleme
+    if (state.mesajlar.any((m) => m.id == mesaj.id)) return;
+
+    state = state.copyWith(mesajlar: [mesaj, ...state.mesajlar]);
+  }
+
+  // Socket'ten gelen iletildi bilgisini isler
+  void iletildiIsaretle(List<String> mesajIdleri, DateTime deliveredAt) {
+    // Mesaj henuz listeye yerlesmemis olabilir, bilgiyi sakla
+    for (final id in mesajIdleri) {
+      _bekleyenIletildi[id] = deliveredAt;
+    }
+
+    state = state.copyWith(
+      mesajlar: [
+        for (final m in state.mesajlar)
+          if (mesajIdleri.contains(m.id) && m.deliveredAt == null)
+            m.copyWith(deliveredAt: deliveredAt)
+          else
+            m,
+      ],
+    );
+  }
+
+  // Karsi taraf sohbeti actiginda tum mesajlar okundu olur
+  void okunduIsaretleYerel(DateTime readAt) {
+    state = state.copyWith(
+      mesajlar: [
+        for (final m in state.mesajlar)
+          if (m.senderId == benimId && m.readAt == null)
+            m.copyWith(readAt: readAt, deliveredAt: m.deliveredAt ?? readAt)
+          else
+            m,
+      ],
+    );
+  }
+
+  // Karsi taraf mesajini sildiginde
+  void mesajSilindiIsaretle(String mesajId) {
+    state = state.copyWith(
+      mesajlar: [
+        for (final m in state.mesajlar)
+          if (m.id == mesajId) m.copyWith(deletedAt: DateTime.now()) else m,
       ],
     );
   }

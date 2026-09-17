@@ -8,6 +8,7 @@ import '../../providers/chat_provider.dart';
 import '../../widgets/bos_durum.dart';
 import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/sohbet_satiri.dart';
+import '../../providers/socket_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -72,11 +73,15 @@ class HomeScreen extends ConsumerWidget {
             child: ListView.separated(
               itemCount: liste.length,
               separatorBuilder: (context, index) => const Divider(indent: 80, height: 1),
-              itemBuilder: (context, index) {
+                            itemBuilder: (context, index) {
                 final sohbet = liste[index];
+                final cevrimiciHarita = ref.watch(cevrimiciProvider);
+                final cevrimici = cevrimiciHarita[sohbet.user.id] ?? sohbet.user.isOnline;
 
                 return SohbetSatiri(
-                  sohbet: sohbet,
+                  sohbet: sohbet.copyWith(
+                    user: sohbet.user.copyWith(isOnline: cevrimici),
+                  ),
                   benimId: benimId,
                   onTap: () => context.push('${Rotalar.chat}/${sohbet.id}'),
                 );

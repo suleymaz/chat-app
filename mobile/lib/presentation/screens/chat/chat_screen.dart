@@ -11,6 +11,9 @@ import '../../widgets/gun_ayraci.dart';
 import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/mesaj_balonu.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
+import '../../providers/socket_provider.dart';
+import '../../widgets/yaziyor_gostergesi.dart';
 
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -29,6 +32,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   UserModel? _karsiTaraf;
   bool _karsiTarafYukleniyor = true;
+    Timer? _yaziyorZamanlayici;
+  bool _yaziyorGonderildi = false;
 
   // "yeni" ise henuz sohbet olusmamis demektir
   bool get _yeniSohbet => widget.conversationId == 'yeni';
@@ -39,22 +44,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         benimId: ref.read(authProvider).kullanici?.id ?? '',
       );
 
-  @override
+    @override
   void initState() {
     super.initState();
     _scrollController.addListener(_kaydirmaDinle);
+    _mesajController.addListener(_yazmaDinle);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _karsiTarafiYukle();
+
       if (!_yeniSohbet) {
+        ref.read(socketServiceProvider).sohbeteKatil(widget.conversationId);
         ref.read(mesajProvider(_param).notifier).okunduIsaretle();
         ref.read(sohbetListesiProvider.notifier).okunduIsaretle(widget.conversationId);
       }
     });
   }
 
-  @override
+    @override
   void dispose() {
+    if (!_yeniSohbet) {
+      ref.read(socketServiceProvider).sohbettenAyril(widget.conversationId);
+      if (_yaziyorGonderildi) {
+        ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+      }
+    }
+
+    _yaziyorZamanlayici?.cancel();
+    _mesajController.removeListener(_yazmaDinle);
     _scrollController.removeListener(_kaydirmaDinle);
     _scrollController.dispose();
     _mesajController.dispose();
@@ -67,6 +84,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(mesajProvider(_param).notifier).eskileriYukle();
     }
+  }
+
+    // Kullanici yazarken karsi tarafa bildirim gonderir
+  void _yazmaDinle() {
+    if (_yeniSohbet) return;
+
+    final bosMu = _mesajController.text.trim().isEmpty;
+
+    if (bosMu) {
+      if (_yaziyorGonderildi) {
+        ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+        _yaziyorGonderildi = false;
+      }
+      _yaziyorZamanlayici?.cancel();
+      return;
+    }
+
+    if (!_yaziyorGonderildi) {
+      ref.read(socketServiceProvider).yaziyorBaslat(widget.conversationId);
+      _yaziyorGonderildi = true;
+    }
+
+    // Yazmayi birakirsa 2 saniye sonra durdur
+    _yaziyorZamanlayici?.cancel();
+    _yaziyorZamanlayici = Timer(const Duration(seconds: 2), () {
+      if (_yaziyorGonderildi) {
+        ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+        _yaziyorGonderildi = false;
+      }
+    });
   }
 
   Future<void> _karsiTarafiYukle() async {
@@ -90,6 +137,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (icerik.isEmpty) return;
 
     _mesajController.clear();
+
+        if (_yaziyorGonderildi) {
+      ref.read(socketServiceProvider).yaziyorBitir(widget.conversationId);
+      _yaziyorGonderildi = false;
+    }
+    _yaziyorZamanlayici?.cancel();
 
     await ref.read(mesajProvider(_param).notifier).mesajGonder(icerik);
 
@@ -163,23 +216,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     final durum = ref.watch(mesajProvider(_param));
     final benimId = ref.watch(authProvider).kullanici?.id ?? '';
+    final yaziyor = ref.watch(yaziyorProvider)[widget.conversationId] ?? false;
+
+    // Sohbet ekrani acikken gelen mesajlari okundu isaretle
+    ref.listen(mesajProvider(_param), (onceki, yeni) {
+      final oncekiSayi = onceki?.mesajlar.length ?? 0;
+      if (yeni.mesajlar.length > oncekiSayi && !_yeniSohbet) {
+        final sonMesaj = yeni.mesajlar.first;
+        if (sonMesaj.senderId != benimId) {
+          ref.read(mesajProvider(_param).notifier).okunduIsaretle();
+        }
+      }
+    });
 
     return Scaffold(
-      appBar: _baslik(),
+      appBar: _baslik(yaziyor),
       body: Column(
         children: [
           Expanded(child: _mesajListesi(durum, benimId)),
+          if (yaziyor) const YaziyorGostergesi(),
           _girisAlani(),
         ],
       ),
     );
   }
 
-  PreferredSizeWidget _baslik() {
+    PreferredSizeWidget _baslik(bool yaziyor) {
+    final cevrimiciHarita = ref.watch(cevrimiciProvider);
+    final cevrimici = _karsiTaraf != null
+        ? (cevrimiciHarita[_karsiTaraf!.id] ?? _karsiTaraf!.isOnline)
+        : false;
+
     return AppBar(
       titleSpacing: 0,
       title: _karsiTarafYukleniyor
@@ -190,6 +261,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   avatarUrl: _karsiTaraf?.avatarUrl,
                   basHarfler: _karsiTaraf?.basHarfler ?? '?',
                   boyut: 36,
+                  cevrimici: cevrimici,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -203,12 +275,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                       if (_karsiTaraf != null)
                         Text(
-                          _karsiTaraf!.isOnline
-                              ? 'cevrimici'
-                              : 'son gorulme ${TarihFormat.sonGorulme(_karsiTaraf!.lastSeenAt)}',
+                          yaziyor
+                              ? 'yaziyor...'
+                              : cevrimici
+                                  ? 'cevrimici'
+                                  : 'son gorulme ${TarihFormat.sonGorulme(_karsiTaraf!.lastSeenAt)}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: _karsiTaraf!.isOnline
+                            color: yaziyor || cevrimici
                                 ? AppColors.online
                                 : AppColors.textTertiary,
                           ),

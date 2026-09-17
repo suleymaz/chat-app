@@ -8,6 +8,7 @@ import { initFirebase } from "./config/firebase.js";
 
 const httpServer = http.createServer(app);
 
+initFirebase();
 initSocket(httpServer);
 
 const server = httpServer.listen(env.PORT, () => {
@@ -25,8 +26,6 @@ const shutdown = async (signal) => {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
-initFirebase();
-initSocket(httpServer);
 
 process.on("unhandledRejection", (reason) => {
   logger.error("Yakalanmamis promise reddi", { reason });

@@ -386,3 +386,31 @@ ve dönen id notifier'a yazılıyor.
 Android 9'dan itibaren şifrelenmemiş HTTP istekleri varsayılan olarak engelleniyor.
 Görseller yüklenmiyordu, AndroidManifest'e usesCleartextTraffic="true" eklemek gerekti.
 Üretimde HTTPS kullanılacağı için bu kaldırılmalı.
+
+
+## Gün 12 — Socket Entegrasyonu
+
+Socket servisini Riverpod'dan bağımsız yazdım — sadece Stream yayınlıyor. Olayları
+provider'lara dağıtan işi ayrı bir koordinatör katmanına verdim. Böylece socket kodu test
+edilebilir ve state yönetiminden bağımsız kaldı.
+
+Uygulama arka plana geçtiğinde socket'i kapatıyorum. Açık bırakırsam backend "bu kullanıcı
+bağlı" deyip socket ile gönderir ama kullanıcı görmez; kapatınca FCM devreye girebiliyor.
+
+En uzun uğraştığım hata buydu: socket bağlanıyor, odaya katılıyor, sonra sessizce ölüyordu.
+Backend "kullanıcı bağlı" diyordu ama odada 0 socket görünüyordu. Sebep server.js içinde
+initSocket'i iki kez çağırmam olmuş — ikinci çağrı aynı HTTP sunucusuna ikinci bir Socket.IO
+örneği bağlıyor ve "handleUpgrade was called more than once" hatası veriyordu. Tek çağrıya
+indirince düzeldi.
+
+Bir de transport ayarı: polling üzerinden websocket'e yükseltme akışı sorun çıkarıyordu,
+doğrudan websocket kullanacak şekilde ayarladım (hem istemcide hem sunucuda).
+
+İletildi tiki görünmüyordu. Sebep zamanlama: backend mesajı oluşturur oluşturmaz hem
+message:new hem message:delivered yayınlıyor, ama REST yanıtı henüz dönmediği için mesaj
+listede hâlâ geçici UUID ile duruyor ve eşleşme bulunamıyor. Gelen delivered bilgisini bir
+haritada bekletip, gerçek mesaj listeye yerleşirken uygulayarak çözdüm.
+
+Yazıyor göstergesi için 2 saniyelik bir zamanlayıcı var — kullanıcı yazmayı bırakınca
+typing:stop gönderiliyor. Alıcı tarafta da 4 saniyelik güvenlik zamanlayıcısı koydum, stop
+olayı kaybolursa gösterge sonsuza kadar açık kalmasın diye.

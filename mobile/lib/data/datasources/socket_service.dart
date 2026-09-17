@@ -1,0 +1,231 @@
+import 'dart:async';
+import 'package:socket_io_client/socket_io_client.dart' as io;
+import '../../core/config/app_config.dart';
+import '../../core/storage/secure_storage.dart';
+import '../models/message_model.dart';
+
+// Socket olaylarinin tasindigi tipler
+class YeniMesajOlayi {
+  final MessageModel mesaj;
+  YeniMesajOlayi(this.mesaj);
+}
+
+class IletildiOlayi {
+  final String conversationId;
+  final List<String> messageIds;
+  final DateTime deliveredAt;
+
+  IletildiOlayi({
+    required this.conversationId,
+    required this.messageIds,
+    required this.deliveredAt,
+  });
+}
+
+class OkunduOlayi {
+  final String conversationId;
+  final DateTime readAt;
+
+  OkunduOlayi({required this.conversationId, required this.readAt});
+}
+
+class MesajSilindiOlayi {
+  final String conversationId;
+  final String messageId;
+
+  MesajSilindiOlayi({required this.conversationId, required this.messageId});
+}
+
+class YaziyorOlayi {
+  final String conversationId;
+  final String userId;
+  final bool isTyping;
+
+  YaziyorOlayi({
+    required this.conversationId,
+    required this.userId,
+    required this.isTyping,
+  });
+}
+
+class DurumOlayi {
+  final String userId;
+  final bool cevrimici;
+  final DateTime? lastSeenAt;
+
+  DurumOlayi({required this.userId, required this.cevrimici, this.lastSeenAt});
+}
+
+class SocketService {
+  io.Socket? _socket;
+  bool _baglaniyor = false;
+
+  final _yeniMesaj = StreamController<YeniMesajOlayi>.broadcast();
+  final _iletildi = StreamController<IletildiOlayi>.broadcast();
+  final _okundu = StreamController<OkunduOlayi>.broadcast();
+  final _mesajSilindi = StreamController<MesajSilindiOlayi>.broadcast();
+  final _yaziyor = StreamController<YaziyorOlayi>.broadcast();
+  final _durum = StreamController<DurumOlayi>.broadcast();
+  final _baglantiDurumu = StreamController<bool>.broadcast();
+
+  Stream<YeniMesajOlayi> get yeniMesaj => _yeniMesaj.stream;
+  Stream<IletildiOlayi> get iletildi => _iletildi.stream;
+  Stream<OkunduOlayi> get okundu => _okundu.stream;
+  Stream<MesajSilindiOlayi> get mesajSilindi => _mesajSilindi.stream;
+  Stream<YaziyorOlayi> get yaziyor => _yaziyor.stream;
+  Stream<DurumOlayi> get durum => _durum.stream;
+  Stream<bool> get baglantiDurumu => _baglantiDurumu.stream;
+
+  bool get bagli => _socket?.connected ?? false;
+
+  // Token yenileme icin disaridan verilen fonksiyon
+  Future<bool> Function()? tokenYenile;
+
+  Future<void> baglan() async {
+    // Zaten bagli veya baglanma surecindeyse tekrar deneme
+    if (_baglaniyor) return;
+    if (_socket != null && _socket!.connected) return;
+
+    _baglaniyor = true;
+
+    try {
+      final token = await SecureStorage.accessTokenAl();
+      if (token == null) {
+        _baglaniyor = false;
+        return;
+      }
+
+      _socket?.dispose();
+      _socket = null;
+
+      // Polling uzerinden websocket'e yukseltme akisi sorun cikardigi icin
+      // dogrudan websocket kullaniyoruz
+      _socket = io.io(
+        AppConfig.socketUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket'])
+            .setAuth({'token': token})
+            .disableAutoConnect()
+            .enableReconnection()
+            .setReconnectionAttempts(5)
+            .setReconnectionDelay(2000)
+            .build(),
+      );
+
+      _dinleyicileriKur();
+      _socket!.connect();
+    } finally {
+      _baglaniyor = false;
+    }
+  }
+
+  void _dinleyicileriKur() {
+    final socket = _socket;
+    if (socket == null) return;
+
+    socket.onConnect((_) {
+      _baglantiDurumu.add(true);
+    });
+
+    socket.onDisconnect((_) {
+      _baglantiDurumu.add(false);
+    });
+
+    socket.onConnectError((hata) async {
+      _baglantiDurumu.add(false);
+
+      // Token suresi dolmus olabilir - yenileyip tekrar dene
+      final mesaj = hata.toString().toLowerCase();
+      if (mesaj.contains('token') || mesaj.contains('jwt')) {
+        final yenilendi = await tokenYenile?.call() ?? false;
+        if (yenilendi) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          await baglan();
+        }
+      }
+    });
+
+    socket.on('message:new', (veri) {
+      final mesaj = MessageModel.fromJson(Map<String, dynamic>.from(veri));
+      _yeniMesaj.add(YeniMesajOlayi(mesaj));
+    });
+
+    socket.on('message:delivered', (veri) {
+      final harita = Map<String, dynamic>.from(veri);
+      _iletildi.add(IletildiOlayi(
+        conversationId: harita['conversationId'] as String,
+        messageIds: (harita['messageIds'] as List).cast<String>(),
+        deliveredAt: DateTime.parse(harita['deliveredAt'] as String),
+      ));
+    });
+
+    socket.on('message:read', (veri) {
+      final harita = Map<String, dynamic>.from(veri);
+      _okundu.add(OkunduOlayi(
+        conversationId: harita['conversationId'] as String,
+        readAt: DateTime.parse(harita['readAt'] as String),
+      ));
+    });
+
+    socket.on('message:deleted', (veri) {
+      final harita = Map<String, dynamic>.from(veri);
+      _mesajSilindi.add(MesajSilindiOlayi(
+        conversationId: harita['conversationId'] as String,
+        messageId: harita['messageId'] as String,
+      ));
+    });
+
+    socket.on('typing', (veri) {
+      final harita = Map<String, dynamic>.from(veri);
+      _yaziyor.add(YaziyorOlayi(
+        conversationId: harita['conversationId'] as String,
+        userId: harita['userId'] as String,
+        isTyping: harita['isTyping'] as bool,
+      ));
+    });
+
+    socket.on('user:online', (veri) {
+      final harita = Map<String, dynamic>.from(veri);
+      _durum.add(DurumOlayi(userId: harita['userId'] as String, cevrimici: true));
+    });
+
+    socket.on('user:offline', (veri) {
+      final harita = Map<String, dynamic>.from(veri);
+      _durum.add(DurumOlayi(
+        userId: harita['userId'] as String,
+        cevrimici: false,
+        lastSeenAt: harita['lastSeenAt'] != null
+            ? DateTime.parse(harita['lastSeenAt'] as String)
+            : null,
+      ));
+    });
+  }
+
+  void sohbeteKatil(String conversationId) {
+    _socket?.emit('conversation:join', {'conversationId': conversationId});
+  }
+
+  void sohbettenAyril(String conversationId) {
+    _socket?.emit('conversation:leave', {'conversationId': conversationId});
+  }
+
+  void yaziyorBaslat(String conversationId) {
+    _socket?.emit('typing:start', {'conversationId': conversationId});
+  }
+
+  void yaziyorBitir(String conversationId) {
+    _socket?.emit('typing:stop', {'conversationId': conversationId});
+  }
+
+  void kopar() {
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+    _baglantiDurumu.add(false);
+  }
+
+  void temizle() {
+    _socket?.dispose();
+    _socket = null;
+  }
+}

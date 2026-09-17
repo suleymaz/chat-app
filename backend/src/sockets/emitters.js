@@ -1,13 +1,23 @@
-import { getIO } from "../config/socket.js";
+import { getIO, kullaniciSocketIdleri } from "../config/socket.js";
+
+// Bir kullanicinin tum acik socket'lerine olay gonderir
+const kullaniciyaGonder = (userId, olay, veri) => {
+  const io = getIO();
+  const soketler = kullaniciSocketIdleri(userId);
+
+  for (const socketId of soketler) {
+    io.to(socketId).emit(olay, veri);
+  }
+};
 
 // Yeni mesaji aliciya iletir
 export const yeniMesajYayinla = (aliciId, mesaj) => {
-  getIO().to(`user:${aliciId}`).emit("message:new", mesaj);
+  kullaniciyaGonder(aliciId, "message:new", mesaj);
 };
 
 // Gonderene mesajin iletildigi bilgisini gonderir
 export const iletildiYayinla = (gonderenId, { conversationId, messageIds, deliveredAt }) => {
-  getIO().to(`user:${gonderenId}`).emit("message:delivered", {
+  kullaniciyaGonder(gonderenId, "message:delivered", {
     conversationId,
     messageIds,
     deliveredAt,
@@ -16,16 +26,10 @@ export const iletildiYayinla = (gonderenId, { conversationId, messageIds, delive
 
 // Gonderene mesajlarin okundugu bilgisini gonderir
 export const okunduYayinla = (gonderenId, { conversationId, readAt }) => {
-  getIO().to(`user:${gonderenId}`).emit("message:read", {
-    conversationId,
-    readAt,
-  });
+  kullaniciyaGonder(gonderenId, "message:read", { conversationId, readAt });
 };
 
 // Silinen mesaji karsi tarafa bildirir
 export const mesajSilindiYayinla = (aliciId, { conversationId, messageId }) => {
-  getIO().to(`user:${aliciId}`).emit("message:deleted", {
-    conversationId,
-    messageId,
-  });
+  kullaniciyaGonder(aliciId, "message:deleted", { conversationId, messageId });
 };

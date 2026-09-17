@@ -174,6 +174,7 @@ function sahteMessaj({ conversationId, senderId, content }) {
 
 // Mesaji aliciya iletir; alici bagliysa socket, degilse FCM kullanilir
 async function mesajIletimi(mesaj, aliciId, gonderen, conversationId) {
+
   emitters.yeniMesajYayinla(aliciId, mesaj);
 
   if (kullaniciBagliMi(aliciId)) {

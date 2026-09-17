@@ -414,3 +414,33 @@ haritada bekletip, gerçek mesaj listeye yerleşirken uygulayarak çözdüm.
 Yazıyor göstergesi için 2 saniyelik bir zamanlayıcı var — kullanıcı yazmayı bırakınca
 typing:stop gönderiliyor. Alıcı tarafta da 4 saniyelik güvenlik zamanlayıcısı koydum, stop
 olayı kaybolursa gösterge sonsuza kadar açık kalmasın diye.
+
+Token yenileme mantığı yazmıştım ama hiç çalışmıyordu. Sebep validateStatus ayarıymış:
+500'ün altındaki yanıtları başarılı sayıyordum, 401'ler onResponse'a düşüyordu ve oradaki
+handler.reject Dio'nun onError akışını tetiklemiyor. Yani interceptor'daki yenileme kodu
+hiç çağrılmıyordu. validateStatus'u kaldırıp 4xx'i Dio'nun kendi hata akışına bırakınca
+düzeldi. Ayrıca _yenileniyor bayrağı hata durumunda sıfırlanmadan kalıyor ve sonraki
+yenilemeler kuyrukta takılıyordu, finally bloğuna taşıdım.
+
+Kullanıcı çevrimdışıyken gelen mesajlar tek tik kalıyordu, sonradan bağlanınca da
+düzelmiyordu. Socket bağlantısı kurulduğunda o kullanıcıya ait iletilmemiş mesajları toplu
+olarak deliveredAt ile işaretleyip gönderene socket üzerinden haber veren bir fonksiyon
+yazdım.
+
+Socket bağlanırken süresi dolmuş token kullanılıyordu — login sonrası yeni token
+kaydedilmeden socket bağlanmaya çalışıyordu. Bağlanmadan önce token'ın exp alanını okuyup
+süresi dolmuşsa önce yenileyecek şekilde düzelttim.
+
+socket.connected bağlantı kurulduktan hemen sonra yanlış sonuç verebiliyor. Bu yüzden
+periyodik kontrol zaten bağlıyken tekrar bağlanmayı deniyor ve loglar "jwt expired" ile
+doluyordu. Bağlantı durumunu kendi bayrağımla takip edecek şekilde değiştirdim.
+
+Sunucu yeniden başlatıldığında socket kopuyor ve Socket.IO'nun otomatik yeniden bağlanması
+her zaman devreye girmiyor. main.dart'a 30 saniyede bir kontrol eden bir zamanlayıcı
+koydum — bağlı değilse yeniden bağlanıyor.
+
+Sohbet listesi ilk açılışta okunmamış rozetlerini göstermiyordu, ancak pull-to-refresh ile
+geliyordu. Ana ekran açıldığında listeyi bir kez tazeleyecek şekilde düzelttim.
+
+Çıkış yapan kullanıcının lastSeenAt değeri güncellenmiyordu, sadece socket disconnect'ine
+güvenmek yeterli olmadı. Logout endpoint'ine bu güncellemeyi ekledim.

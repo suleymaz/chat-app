@@ -65,6 +65,13 @@ class SocketService {
   // durumu kendi bayragimizla takip ediyoruz
   bool _bagliMi = false;
 
+  // Bir baglanti dongusunde token yenilemeyi yalnizca bir kez deneriz. Sunucuya
+  // hic ulasilamadiginda her hatada yenileme atmak gereksiz istek uretiyordu.
+  bool _yenilemeDenendi = false;
+
+  // Basarisiz yeniden baglanma sayisi - bekleme suresi buna gore artar
+  int _denemeSayisi = 0;
+
   final _yeniMesaj = StreamController<YeniMesajOlayi>.broadcast();
   final _iletildi = StreamController<IletildiOlayi>.broadcast();
   final _okundu = StreamController<OkunduOlayi>.broadcast();
@@ -156,6 +163,8 @@ class SocketService {
 
     socket.onConnect((_) {
       _bagliMi = true;
+      _yenilemeDenendi = false;
+      _denemeSayisi = 0;
       _baglantiDurumu.add(true);
     });
 
@@ -168,19 +177,28 @@ class SocketService {
       _bagliMi = false;
       _baglantiDurumu.add(false);
 
-      // Token suresi dolmus olabilir - yenileyip tekrar dene
+      // Token suresi dolmus olabilir - yenileyip tekrar dene.
+      // Sunucu erisilemezse her hatada yenilemeye calismanin anlami yok,
+      // bu dongude bir kez denenir; gerisini socket.io'nun kendi
+      // yeniden baglanmasi ve onReconnectFailed ustleniyor.
+      if (_yenilemeDenendi) return;
+      _yenilemeDenendi = true;
+
       final yenilendi = await tokenYenile?.call() ?? false;
-      if (yenilendi) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        await baglan();
-      }
+      if (!yenilendi) return;
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      await baglan();
     });
 
     // Sunucu yeniden baslatildiginda otomatik yeniden baglanma tukenebiliyor,
-    // o durumda sifirdan baglaniyoruz
+    // o durumda sifirdan baglaniyoruz. Bekleme her denemede uzar.
     socket.onReconnectFailed((_) async {
       _bagliMi = false;
-      await Future.delayed(const Duration(seconds: 3));
+      _denemeSayisi++;
+
+      final saniye = (3 * _denemeSayisi).clamp(3, 60);
+      await Future.delayed(Duration(seconds: saniye));
       await baglan();
     });
 
@@ -266,6 +284,8 @@ class SocketService {
     final socket = _socket;
     _socket = null;
     _bagliMi = false;
+    _yenilemeDenendi = false;
+    _denemeSayisi = 0;
 
     if (socket != null) {
       socket.clearListeners();

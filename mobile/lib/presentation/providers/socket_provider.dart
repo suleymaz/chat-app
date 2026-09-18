@@ -1,8 +1,5 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
-import '../../core/config/app_config.dart';
-import '../../core/storage/secure_storage.dart';
 import '../../data/datasources/socket_service.dart';
 import 'auth_provider.dart';
 import 'chat_provider.dart';
@@ -11,26 +8,9 @@ import 'message_provider.dart';
 final socketServiceProvider = Provider<SocketService>((ref) {
   final servis = SocketService();
 
-  // Token suresi dolarsa yenileme fonksiyonu
-  servis.tokenYenile = () async {
-    try {
-      final refreshToken = await SecureStorage.refreshTokenAl();
-      if (refreshToken == null) return false;
-
-      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiUrl));
-      final yanit = await dio.post('/auth/refresh', data: {'refreshToken': refreshToken});
-
-      final veri = yanit.data['data'];
-      await SecureStorage.tokenKaydet(
-        accessToken: veri['accessToken'] as String,
-        refreshToken: veri['refreshToken'] as String,
-      );
-
-      return true;
-    } catch (_) {
-      return false;
-    }
-  };
+  // Yenileme ApiClient uzerinden yapilir. Socket'in kendi yenilemesi olsaydi
+  // ayni anda iki istek ayni refresh token'i harcar ve sunucu oturumu kapatirdi.
+  servis.tokenYenile = ref.read(apiClientProvider).tokenYenile;
 
   ref.onDispose(servis.temizle);
   return servis;
@@ -119,7 +99,7 @@ class SocketKoordinator {
     }
 
     // Sohbet listesi tazelenince ilgili sohbet ustte cikar
-    _ref.read(sohbetListesiProvider.notifier).tazele();
+    _ref.read(sohbetListesiProvider.notifier).tazelemeIste();
   }
 
   // Bu olay sadece tik durumunu etkiliyor, liste sirasini degistirmiyor.
@@ -151,7 +131,7 @@ class SocketKoordinator {
     }
 
     // Son mesaj silindiyse listede "Bu mesaj silindi" gorunmeli
-    _ref.read(sohbetListesiProvider.notifier).tazele();
+    _ref.read(sohbetListesiProvider.notifier).tazelemeIste();
   }
 
   void _yaziyorGeldi(YaziyorOlayi olay) {

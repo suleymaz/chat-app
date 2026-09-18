@@ -55,13 +55,14 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
   // Mesaj listeye yerlesmeden once gelen iletildi bilgileri burada bekler
   final Map<String, DateTime> _bekleyenIletildi = {};
 
-  MesajNotifier({
-    required ChatRepository repo,
+  // Repo konumsal parametre: adlandirilmis parametreler private alana
+  // dogrudan atanamiyor, ara degisken kullanmak yerine boyle aliyoruz.
+  MesajNotifier(
+    this._repo, {
     required this.conversationId,
     required this.karsiTarafId,
     required this.benimId,
-  })  : _repo = repo,
-        super(MesajDurum()) {
+  }) : super(MesajDurum()) {
     if (conversationId != null) {
       ilkYukleme();
     } else {
@@ -273,7 +274,7 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
 final mesajProvider =
     StateNotifierProvider.autoDispose.family<MesajNotifier, MesajDurum, MesajParam>(
   (ref, param) => MesajNotifier(
-    repo: ref.watch(chatRepositoryProvider),
+    ref.watch(chatRepositoryProvider),
     conversationId: param.conversationId,
     karsiTarafId: param.karsiTarafId,
     benimId: param.benimId,

@@ -123,7 +123,7 @@ export const getBlockedUsers = async (userId) => {
 
 export const avatarGuncelle = async (userId, dosya) => {
   const bilgi = await fileService.gorselIsle(dosya.path, { maxGenislik: 512, kalite: 85 });
-  const url = fileService.urlUret("avatars", dosya.filename);
+  const url = fileService.urlUret("avatars", bilgi.dosyaAdi);
 
   const eskiKullanici = await userRepo.findById(userId);
 

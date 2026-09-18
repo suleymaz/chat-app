@@ -90,16 +90,29 @@ export const listeGetir = async (userId, { arsivlenmis = false }) => {
   return katilimlar;
 };
 
-// Okunmamis mesaj sayisi - lastReadAt sonrasi, baskasindan gelen mesajlar
-export const okunmamisSayisi = (conversationId, userId, lastReadAt) =>
-  prisma.message.count({
+// Tum sohbetlerin okunmamis sayisini tek sorguda hesaplar. Her sohbetin kendi
+// lastReadAt esigi oldugu icin kosullar OR ile birlestiriliyor.
+// Sohbet basina ayri count atmak listede N+1 sorgu uretiyordu.
+export const okunmamisSayilari = async (userId, katilimlar) => {
+  if (katilimlar.length === 0) return new Map();
+
+  const kosullar = katilimlar.map(({ conversationId, lastReadAt }) => ({
+    conversationId,
+    ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
+  }));
+
+  const sonuclar = await prisma.message.groupBy({
+    by: ["conversationId"],
     where: {
-      conversationId,
       senderId: { not: userId },
       deletedAt: null,
-      createdAt: lastReadAt ? { gt: lastReadAt } : undefined,
+      OR: kosullar,
     },
+    _count: { _all: true },
   });
+
+  return new Map(sonuclar.map((s) => [s.conversationId, s._count._all]));
+};
 
 export const okunduIsaretle = (conversationId, userId) =>
   prisma.conversationParticipant.update({

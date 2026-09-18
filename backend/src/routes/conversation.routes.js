@@ -32,8 +32,19 @@ router.patch("/:id/archive", validate(arsivSchema), conversationController.arsiv
 // Sohbet icindeki mesajlar
 router.get("/:id/messages", validate(mesajListeSchema), messageController.listele);
 router.post("/:id/messages", validate(mesajGonderSchema), messageController.gonder);
-router.post("/:id/messages/image", uploadHandler(mesajGorseliUpload), messageController.gorselGonder);
-router.post("/:id/messages/file", uploadHandler(mesajDosyasiUpload), messageController.dosyaGonder);
+// Ek yuklerken once sohbet id'si dogrulanir - gecersiz id icin dosya diske yazilmasin
+router.post(
+  "/:id/messages/image",
+  validate(conversationIdSchema),
+  uploadHandler(mesajGorseliUpload),
+  messageController.gorselGonder
+);
+router.post(
+  "/:id/messages/file",
+  validate(conversationIdSchema),
+  uploadHandler(mesajDosyasiUpload),
+  messageController.dosyaGonder
+);
 router.get("/:id/messages/search", validate(mesajAraSchema), messageController.ara);
 
 export default router;

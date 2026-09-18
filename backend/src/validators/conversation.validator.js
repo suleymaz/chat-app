@@ -17,7 +17,8 @@ export const mesajListeSchema = z.object({
     id: z.string().uuid("Gecersiz sohbet id"),
   }),
   query: z.object({
-    cursor: z.string().datetime().optional(),
+    // Imlec "ISO tarih|mesaj id" bicimindedir, istemci icin opak bir degerdir
+    cursor: z.string().max(120).optional(),
     limit: z.coerce.number().min(1).max(100).default(30).optional(),
   }),
 });

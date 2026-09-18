@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/config/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/tarih_formatla.dart';
 import '../../../data/datasources/socket_service.dart';
@@ -151,11 +153,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     _yaziyorZamanlayici?.cancel();
 
-    await ref.read(mesajProvider(_param).notifier).mesajGonder(icerik);
-
-    _enAltaKaydir();
+    final notifier = ref.read(mesajProvider(_param).notifier);
+    await notifier.mesajGonder(icerik);
 
     ref.read(sohbetListesiProvider.notifier).tazele();
+
+    // Ilk mesajla sohbet olustuysa ekrani gercek sohbet id'sine tasiyoruz.
+    // Aksi halde ekran "yeni" anahtariyla acik kaliyor: socket olaylari farkli
+    // anahtarla geldigi icin bu ekrana ulasmiyor, sohbet odasina da
+    // katilinmadigi icin yaziyor gostergesi calismiyordu.
+    final olusanId = notifier.olusanSohbetId;
+
+    if (_yeniSohbet && olusanId != null && mounted) {
+      context.replace('${Rotalar.chat}/$olusanId');
+      return;
+    }
+
+    _enAltaKaydir();
   }
 
   void _enAltaKaydir() {

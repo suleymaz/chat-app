@@ -118,7 +118,3 @@ export const logout = async (refreshToken, userId) => {
     await tokenRepo.revokeById(stored.id);
   }
 };
-
-export const logoutAll = async (userId) => {
-  await tokenRepo.revokeAllForUser(userId);
-};

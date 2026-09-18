@@ -1,11 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage.dart';
+import '../../data/datasources/push_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/user_repository.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (ref) => NotificationRepository(ref.watch(apiClientProvider)),
+);
+
+final pushServiceProvider = Provider<PushService>((ref) {
+  final servis = PushService(ref.watch(notificationRepositoryProvider));
+  ref.onDispose(servis.temizle);
+  return servis;
+});
 
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(ref.watch(apiClientProvider)),
@@ -37,6 +49,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final UserRepository _userRepo;
 
   AuthNotifier(this._authRepo, this._userRepo) : super(AuthState());
+
+  // Cikis oncesi calistirilacak is - FCM token'i token'lar silinmeden once
+  // sunucudan kaldirmak icin main.dart tarafindan ayarlanir
+  Future<void> Function()? cikisOncesi;
 
   // Uygulama acilisinda kayitli token varsa oturumu geri yukler
   Future<void> baslat() async {
@@ -84,6 +100,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> cikisYap() async {
+    await cikisOncesi?.call();
     await _authRepo.cikisYap();
     state = AuthState(durum: OturumDurumu.girisYapilmadi);
   }

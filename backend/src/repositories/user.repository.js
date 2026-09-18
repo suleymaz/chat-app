@@ -21,9 +21,6 @@ export const findById = (id) =>
 export const findByIdWithPassword = (id) =>
   prisma.user.findUnique({ where: { id } });
 
-export const findByEmail = (email) =>
-  prisma.user.findUnique({ where: { email } });
-
 export const findByUsername = (username) =>
   prisma.user.findUnique({ where: { username } });
 

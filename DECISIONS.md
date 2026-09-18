@@ -444,3 +444,40 @@ geliyordu. Ana ekran açıldığında listeyi bir kez tazeleyecek şekilde düze
 
 Çıkış yapan kullanıcının lastSeenAt değeri güncellenmiyordu, sadece socket disconnect'ine
 güvenmek yeterli olmadı. Logout endpoint'ine bu güncellemeyi ekledim.
+
+
+
+## Gün 12 sonu — Kod Denetimi
+
+Projeyi baştan sona gözden geçirdim, bulduğum sorunları düzelttim:
+
+Backend'in çalışma zamanı bağımlılıklarından dördü (socket.io, multer, sharp,
+firebase-admin) yanlışlıkla kök klasöre kurulmuş. Node üst klasöre çıkıp bulduğu için
+çalışıyordu ama backend/ tek başına deploy edilse açılmazdı. backend/package.json'a
+taşıdım.
+
+/auth/logout iki kez tanımlıydı, Express ilkini çalıştırdığı için lastSeenAt güncellemesi
+hiç devreye girmiyordu. Ayrıca girisKontrol yerine opsiyonelGiris kullandım — token süresi
+dolmuş kullanıcı da çıkış yapabilmeli, yoksa refresh token sunucuda iptal edilmeden kalıyor.
+
+İki ayrı yerden token yenileme yapılıyordu (api_client ve socket_provider). Backend'de
+rotation + reuse detection olduğu için ikisi yarışınca sunucu tüm oturumu iptal ediyordu.
+Tek noktaya indirdim, uçuştaki yenileme paylaşılıyor.
+
+Silinen sohbet kara delik oluyordu: karşı taraf mesaj atmaya devam edince mesajlar
+veritabanına yazılıyor ama listede görünmüyordu. Mesaj oluşturma transaction'ına alıcının
+katılım kaydını canlandıran bir adım ekledim.
+
+Yeni sohbet akışında socket olayları ekrana ulaşmıyordu — provider anahtarı (null, userId)
+iken koordinatör (gerçekId, null) üretiyordu. İlk mesajdan sonra ekranı gerçek id'ye
+taşıyarak çözdüm.
+
+Genel rate limit tanımlıydı ama hiçbir yerde kullanılmıyordu, sadece auth uçları
+korunuyordu. conversation:join üyelik doğrulaması yapmıyordu, herhangi bir kullanıcı
+rastgele sohbetin yazıyor olaylarını dinleyebiliyordu.
+
+Sayfalama imleci sadece createdAt kullanıyordu, aynı milisaniyede oluşan mesajlarda
+atlama olabilirdi. (createdAt, id) bileşik imlecine geçtim.
+
+Sohbet listesi her sohbet için ayrı okunmamış sayısı sorgusu atıyordu (N+1). Tek groupBy
+ile topluca çekiyorum.

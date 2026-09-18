@@ -20,31 +20,27 @@ const erisimKontrol = async (conversationId, userId) => {
 export const listele = async (userId, { archived = false } = {}) => {
   const katilimlar = await conversationRepo.listeGetir(userId, { arsivlenmis: archived });
 
-  const sohbetler = await Promise.all(
-    katilimlar.map(async (katilim) => {
-      const sohbet = katilim.conversation;
-      const karsiTaraf = sohbet.participants[0]?.user ?? null;
-      const sonMesaj = sohbet.messages[0] ?? null;
-
-      const okunmamis = await conversationRepo.okunmamisSayisi(
-        sohbet.id,
-        userId,
-        katilim.lastReadAt
-      );
-
-      return {
-        id: sohbet.id,
-        user: karsiTaraf,
-        lastMessage: sonMesaj,
-        unreadCount: okunmamis,
-        isMuted: katilim.isMuted,
-        isArchived: katilim.archivedAt !== null,
-        lastMessageAt: sohbet.lastMessageAt,
-      };
-    })
+  // Okunmamis sayilari tek sorguda gelir - sohbet basina ayri count atmiyoruz
+  const okunmamisHarita = await conversationRepo.okunmamisSayilari(
+    userId,
+    katilimlar.map((k) => ({ conversationId: k.conversationId, lastReadAt: k.lastReadAt }))
   );
 
-  return sohbetler;
+  return katilimlar.map((katilim) => {
+    const sohbet = katilim.conversation;
+    const karsiTaraf = sohbet.participants[0]?.user ?? null;
+    const sonMesaj = sohbet.messages[0] ?? null;
+
+    return {
+      id: sohbet.id,
+      user: karsiTaraf,
+      lastMessage: sonMesaj,
+      unreadCount: okunmamisHarita.get(sohbet.id) ?? 0,
+      isMuted: katilim.isMuted,
+      isArchived: katilim.archivedAt !== null,
+      lastMessageAt: sohbet.lastMessageAt,
+    };
+  });
 };
 
 // Sohbet detayi

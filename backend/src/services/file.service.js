@@ -4,36 +4,75 @@ import path from "path";
 import { env } from "../config/env.js";
 import logger from "../utils/logger.js";
 
-// Yuklenen gorseli yeniden boyutlandirip sikistirir
+const MIME_TURLERI = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+};
+
+// Diskteki dosyanin olcu, boyut ve tur bilgisini toplar
+const gorselBilgisi = async (yol) => {
+  const istatistik = await fs.stat(yol);
+  const uzanti = path.extname(yol).toLowerCase();
+
+  let width = null;
+  let height = null;
+
+  try {
+    const bilgi = await sharp(yol).metadata();
+    width = bilgi.width ?? null;
+    height = bilgi.height ?? null;
+  } catch {
+    // Olcu okunamazsa null kalir, mesaj yine de gonderilir
+  }
+
+  return {
+    width,
+    height,
+    sizeBytes: istatistik.size,
+    dosyaAdi: path.basename(yol),
+    mimeType: MIME_TURLERI[uzanti] ?? "application/octet-stream",
+  };
+};
+
+// Yuklenen gorseli yeniden boyutlandirip sikistirir.
+// Cikti her zaman .jpg olarak yazilir; daha once icerik JPEG'e cevriliyor ama
+// dosya adi .png kaliyordu ve servis edilen Content-Type yanlis oluyordu.
 export const gorselIsle = async (dosyaYolu, { maxGenislik = 1280, kalite = 80 } = {}) => {
+  const uzanti = path.extname(dosyaYolu).toLowerCase();
+
+  // GIF donusturulmez, aksi halde animasyon kaybolur
+  if (uzanti === ".gif") {
+    return gorselBilgisi(dosyaYolu);
+  }
+
+  const dizin = path.dirname(dosyaYolu);
+  const taban = path.basename(dosyaYolu, path.extname(dosyaYolu));
+  const hedefYol = path.join(dizin, `${taban}.jpg`);
   const gecici = `${dosyaYolu}.tmp`;
 
   try {
-    const bilgi = await sharp(dosyaYolu).metadata();
-
     await sharp(dosyaYolu)
       .rotate()
       .resize({ width: maxGenislik, withoutEnlargement: true })
       .jpeg({ quality: kalite })
       .toFile(gecici);
 
-    await fs.rename(gecici, dosyaYolu);
+    if (hedefYol !== dosyaYolu) {
+      await fs.rm(dosyaYolu, { force: true });
+    }
 
-    const yeniBilgi = await sharp(dosyaYolu).metadata();
-    const istatistik = await fs.stat(dosyaYolu);
+    await fs.rename(gecici, hedefYol);
 
-    return {
-      width: yeniBilgi.width,
-      height: yeniBilgi.height,
-      sizeBytes: istatistik.size,
-      orijinalBoyut: { width: bilgi.width, height: bilgi.height },
-    };
+    return gorselBilgisi(hedefYol);
   } catch (error) {
     logger.error("Gorsel islenemedi", { dosyaYolu, message: error.message });
     await fs.unlink(gecici).catch(() => {});
 
-    const istatistik = await fs.stat(dosyaYolu);
-    return { width: null, height: null, sizeBytes: istatistik.size };
+    // Islenemezse orijinal dosya oldugu gibi kullanilir
+    return gorselBilgisi(dosyaYolu);
   }
 };
 

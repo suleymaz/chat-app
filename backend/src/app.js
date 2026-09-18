@@ -7,6 +7,8 @@ import routes from './routes/index.js';
 import { env } from './config/env.js';
 import logger from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import { generalLimiter } from './middlewares/rateLimit.js';
+import { corsOrigin } from './config/cors.js';
 
 const app = express();
 
@@ -15,7 +17,7 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
-app.use(cors({ origin: '*', credentials: false }));
+app.use(cors({ origin: corsOrigin(), credentials: false }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -39,7 +41,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/v1', routes);
+// Genel istek siniri - auth uclarindaki daha siki limit ayrica uygulanir
+app.use('/api/v1', generalLimiter, routes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

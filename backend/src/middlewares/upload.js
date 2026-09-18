@@ -69,30 +69,42 @@ const dosyaFiltre = (req, file, cb) => {
   cb(null, true);
 };
 
-export const avatarUpload = multer({
-  storage: storage("avatars"),
-  fileFilter: gorselFiltre,
-  limits: { fileSize: env.MAX_FILE_SIZE },
-}).single("file");
+// Limiti middleware'in uzerinde tasiyoruz ki hata mesaji dogru degeri yazsin
+const yukleyiciOlustur = ({ altKlasor, filtre, limit }) => {
+  const yukleyici = multer({
+    storage: storage(altKlasor),
+    fileFilter: filtre,
+    limits: { fileSize: limit },
+  }).single("file");
 
-export const mesajGorseliUpload = multer({
-  storage: storage("messages"),
-  fileFilter: gorselFiltre,
-  limits: { fileSize: env.MAX_FILE_SIZE },
-}).single("file");
+  yukleyici.limitBayt = limit;
+  return yukleyici;
+};
 
-export const mesajDosyasiUpload = multer({
-  storage: storage("files"),
-  fileFilter: dosyaFiltre,
-  limits: { fileSize: env.MAX_DOCUMENT_SIZE },
-}).single("file");
+export const avatarUpload = yukleyiciOlustur({
+  altKlasor: "avatars",
+  filtre: gorselFiltre,
+  limit: env.MAX_FILE_SIZE,
+});
+
+export const mesajGorseliUpload = yukleyiciOlustur({
+  altKlasor: "messages",
+  filtre: gorselFiltre,
+  limit: env.MAX_FILE_SIZE,
+});
+
+export const mesajDosyasiUpload = yukleyiciOlustur({
+  altKlasor: "files",
+  filtre: dosyaFiltre,
+  limit: env.MAX_DOCUMENT_SIZE,
+});
 
 // Multer hatalarini ApiError'a cevirir
 export const uploadHandler = (uploader) => (req, res, next) => {
   uploader(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
-        const mb = Math.round(env.MAX_FILE_SIZE / 1024 / 1024);
+        const mb = Math.round((uploader.limitBayt ?? env.MAX_FILE_SIZE) / 1024 / 1024);
         return next(ApiError.badRequest(`Dosya boyutu en fazla ${mb} MB olabilir`, "FILE_TOO_LARGE"));
       }
       return next(ApiError.badRequest("Dosya yuklenemedi", "UPLOAD_ERROR"));

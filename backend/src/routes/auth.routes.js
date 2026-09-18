@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as authController from "../controllers/auth.controller.js";
 import { validate } from "../middlewares/validate.js";
 import { authLimiter } from "../middlewares/rateLimit.js";
-import { girisKontrol } from "../middlewares/auth.middleware.js";
+import { opsiyonelGiris } from "../middlewares/auth.middleware.js";
 import {
   registerSchema,
   loginSchema,
@@ -21,10 +21,8 @@ router.post("/login", authLimiter, validate(loginSchema), authController.login);
 // Token yenileme: refresh token ile yeni access token alinir
 router.post("/refresh", validate(refreshSchema), authController.refresh);
 
-// Cikis: refresh token iptal edilir
-router.post("/logout", validate(logoutSchema), authController.logout);
-
-// Cikis: refresh token iptal edilir
-router.post("/logout", girisKontrol, validate(logoutSchema), authController.logout);
+// Cikis: refresh token iptal edilir. Token suresi dolmus kullanici da cikabilsin
+// diye giris zorunlu degil; token varsa lastSeenAt de guncellenir.
+router.post("/logout", opsiyonelGiris, validate(logoutSchema), authController.logout);
 
 export default router;

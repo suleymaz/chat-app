@@ -34,16 +34,25 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
     // Interceptor oturumu kapatirsa socket de kapansin
     ref.read(apiClientProvider).oturumKapandi = () {
       ref.read(socketServiceProvider).kopar();
+      ref.read(pushServiceProvider).tokenSil();
       ref.read(authProvider.notifier).oturumSonlandir();
     };
 
+    // Cikis yaparken FCM kaydi, token'lar hala gecerliyken silinmeli
+    ref.read(authProvider.notifier).cikisOncesi =
+        () => ref.read(pushServiceProvider).tokenSil();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Firebase yapilandirilmamissa sessizce devre disi kalir
+      await ref.read(pushServiceProvider).baslat();
+
       await ref.read(authProvider.notifier).baslat();
 
       // Uygulama acilisinda oturum zaten aciksa socket'i baglat
       if (ref.read(authProvider).durum == OturumDurumu.girisYapildi) {
         ref.read(socketKoordinatorProvider).basla();
         await ref.read(socketServiceProvider).baglan();
+        await ref.read(pushServiceProvider).tokenKaydet();
       }
     });
 
@@ -94,9 +103,10 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
           onceki?.durum != OturumDurumu.girisYapildi) {
         ref.read(socketKoordinatorProvider).basla();
 
-        // Token'in depoya yazilmasini bekle, yoksa socket eski token'la baglaniyor
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Token'lar AuthRepository tarafindan bu noktadan once yaziliyor,
+        // ayrica socket baglanmadan once token suresini kendisi kontrol ediyor
         await ref.read(socketServiceProvider).baglan();
+        await ref.read(pushServiceProvider).tokenKaydet();
       }
 
       if (yeni.durum == OturumDurumu.girisYapilmadi &&

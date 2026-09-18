@@ -15,26 +15,6 @@ export const engelVarMi = async (userId, digerUserId) => {
   return kayit !== null;
 };
 
-// Belirli bir kullanicinin engellediklerinin id listesi
-export const engellenenIdler = async (userId) => {
-  const kayitlar = await prisma.block.findMany({
-    where: { blockerId: userId },
-    select: { blockedId: true },
-  });
-
-  return kayitlar.map((k) => k.blockedId);
-};
-
-// Kullaniciyi engelleyenlerin id listesi
-export const engelleyenIdler = async (userId) => {
-  const kayitlar = await prisma.block.findMany({
-    where: { blockedId: userId },
-    select: { blockerId: true },
-  });
-
-  return kayitlar.map((k) => k.blockerId);
-};
-
 // Aramada ve listelemede haric tutulacak tum id'ler (cift yonlu)
 export const iliskisizIdler = async (userId) => {
   const kayitlar = await prisma.block.findMany({

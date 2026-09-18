@@ -1,6 +1,8 @@
 import { Server } from "socket.io";
 import { verifyAccessToken } from "../utils/token.js";
 import * as userRepo from "../repositories/user.repository.js";
+import * as conversationRepo from "../repositories/conversation.repository.js";
+import { corsOrigin } from "./cors.js";
 import logger from "../utils/logger.js";
 
 let io = null;
@@ -19,7 +21,7 @@ export const initSocket = (httpServer) => {
 
     io = new Server(httpServer, {
     cors: {
-      origin: "*",
+      origin: corsOrigin(),
       methods: ["GET", "POST"],
     },
     pingTimeout: 60000,
@@ -78,11 +80,19 @@ const baglantiKur = async (socket) => {
     await bekleyenMesajlariIlet(userId);
   }
 
-  // Sohbet odasina katilma - yaziyor gostergesi icin
-  socket.on("conversation:join", ({ conversationId }) => {
-    if (conversationId) {
-      socket.join(`conversation:${conversationId}`);
+  // Sohbet odasina katilma - yaziyor gostergesi icin.
+  // Sadece sohbetin katilimcisi odaya girebilir.
+  socket.on("conversation:join", async ({ conversationId }) => {
+    if (!conversationId) return;
+
+    const katilim = await conversationRepo.katilimBul(conversationId, userId);
+
+    if (!katilim || katilim.deletedAt) {
+      logger.warn(`Yetkisiz sohbet odasi denemesi: ${username} -> ${conversationId}`);
+      return;
     }
+
+    socket.join(`conversation:${conversationId}`);
   });
 
   socket.on("conversation:leave", ({ conversationId }) => {

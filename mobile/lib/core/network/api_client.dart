@@ -10,6 +10,11 @@ class ApiClient {
   bool _yenileniyor = false;
   final List<({RequestOptions options, ErrorInterceptorHandler handler})> _bekleyenler = [];
 
+  // Uygulamadaki tek yenileme noktasi. Socket servisi de bunu cagirir:
+  // iki ayri yenileme yarisirsa ikincisi artik iptal edilmis refresh token
+  // sunar, sunucu bunu token hirsizligi sayip tum oturumlari kapatir.
+  Future<bool>? _yenilemeIslemi;
+
   // Oturum tamamen kapandiginda tetiklenir - router giris ekranina yonlendirir
   void Function()? oturumKapandi;
 
@@ -108,22 +113,21 @@ class ApiClient {
     );
   }
 
-    Future<void> _tokenYenileVeTekrarla(DioException err, ErrorInterceptorHandler handler) async {
-    // Baska bir istek zaten yeniliyorsa kuyruga al
-    if (_yenileniyor) {
-      _bekleyenler.add((options: err.requestOptions, handler: handler));
-      return;
-    }
+  // Devam eden bir yenileme varsa yenisi baslatilmaz, ayni sonuc paylasilir
+  Future<bool> tokenYenile() {
+    final mevcut = _yenilemeIslemi;
+    if (mevcut != null) return mevcut;
 
-    _yenileniyor = true;
+    final islem = _yenilemeYap();
+    _yenilemeIslemi = islem;
 
+    return islem.whenComplete(() => _yenilemeIslemi = null);
+  }
+
+  Future<bool> _yenilemeYap() async {
     try {
       final refreshToken = await SecureStorage.refreshTokenAl();
-
-      if (refreshToken == null) {
-        await _oturumuKapat(err, handler);
-        return;
-      }
+      if (refreshToken == null) return false;
 
       // Yenileme istegi interceptor'dan gecmemeli, ayri bir Dio kullaniyoruz
       final temizDio = Dio(BaseOptions(baseUrl: AppConfig.apiUrl));
@@ -134,6 +138,29 @@ class ApiClient {
         accessToken: veri['accessToken'] as String,
         refreshToken: veri['refreshToken'] as String,
       );
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _tokenYenileVeTekrarla(DioException err, ErrorInterceptorHandler handler) async {
+    // Baska bir istek zaten yeniliyorsa kuyruga al
+    if (_yenileniyor) {
+      _bekleyenler.add((options: err.requestOptions, handler: handler));
+      return;
+    }
+
+    _yenileniyor = true;
+
+    try {
+      final yenilendi = await tokenYenile();
+
+      if (!yenilendi) {
+        await _oturumuKapat(err, handler);
+        return;
+      }
 
       // Basarisiz olan istegi tekrarla
       await _istegiTekrarla(err.requestOptions, handler);

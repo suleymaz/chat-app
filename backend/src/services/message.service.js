@@ -36,7 +36,7 @@ export const listele = async (userId, conversationId, { cursor, limit = 30 }) =>
   const sayfa = devamVar ? mesajlar.slice(0, limit) : mesajlar;
 
   const sonMesaj = sayfa[sayfa.length - 1];
-  const nextCursor = devamVar && sonMesaj ? sonMesaj.createdAt.toISOString() : null;
+  const nextCursor = devamVar && sonMesaj ? messageRepo.imlecUret(sonMesaj) : null;
 
   return {
     items: sayfa.map(mesajTemizle),
@@ -178,15 +178,17 @@ async function mesajIletimi(mesaj, aliciId, gonderen, conversationId) {
   emitters.yeniMesajYayinla(aliciId, mesaj);
 
   if (kullaniciBagliMi(aliciId)) {
-    // Alici cevrimiciyse mesaj hemen iletilmis sayilir, bildirime gerek yok
-    const iletilmeZamani = new Date();
-
-    await messageRepo.iletildiIsaretle(mesaj.conversationId, aliciId);
+    // Alici cevrimiciyse mesaj hemen iletilmis sayilir, bildirime gerek yok.
+    // Arada kalmis eski mesajlar da isaretlenir, hepsinin tiki guncellensin.
+    const { messageIds, deliveredAt } = await messageRepo.iletildiIsaretle(
+      mesaj.conversationId,
+      aliciId
+    );
 
     emitters.iletildiYayinla(gonderen.id, {
       conversationId: mesaj.conversationId,
-      messageIds: [mesaj.id],
-      deliveredAt: iletilmeZamani,
+      messageIds: messageIds.length > 0 ? messageIds : [mesaj.id],
+      deliveredAt: deliveredAt ?? new Date(),
     });
 
     return;
@@ -206,6 +208,8 @@ async function mesajIletimi(mesaj, aliciId, gonderen, conversationId) {
 }
 
 export const gorselGonder = async (gonderen, conversationId, { content, dosya }) => {
+  await ekIcerikKontrol(content, "messages", dosya);
+
   const { karsiTarafId, engelli } = await ekOncesiKontrol(gonderen.id, conversationId);
 
   if (engelli) {
@@ -214,7 +218,7 @@ export const gorselGonder = async (gonderen, conversationId, { content, dosya })
   }
 
   const bilgi = await fileService.gorselIsle(dosya.path);
-  const url = fileService.urlUret("messages", dosya.filename);
+  const url = fileService.urlUret("messages", bilgi.dosyaAdi);
 
   const mesaj = await messageRepo.ekliMesajOlustur({
     conversationId,
@@ -223,7 +227,7 @@ export const gorselGonder = async (gonderen, conversationId, { content, dosya })
     type: "IMAGE",
     ek: {
       url,
-      mimeType: "image/jpeg",
+      mimeType: bilgi.mimeType,
       sizeBytes: bilgi.sizeBytes,
       width: bilgi.width,
       height: bilgi.height,
@@ -236,6 +240,8 @@ export const gorselGonder = async (gonderen, conversationId, { content, dosya })
 };
 
 export const dosyaGonder = async (gonderen, conversationId, { content, dosya }) => {
+  await ekIcerikKontrol(content, "files", dosya);
+
   const { karsiTarafId, engelli } = await ekOncesiKontrol(gonderen.id, conversationId);
 
   if (engelli) {
@@ -262,6 +268,21 @@ export const dosyaGonder = async (gonderen, conversationId, { content, dosya }) 
 
   return mesaj;
 };
+
+// Ek mesajlarin aciklama metni multipart govdede geldigi icin zod'dan gecmiyor.
+// Metin mesajlariyla ayni siniri burada uyguluyoruz; asarsa yuklenen dosya silinir.
+const EK_ICERIK_SINIRI = 4000;
+
+async function ekIcerikKontrol(content, altKlasor, dosya) {
+  if (!content || content.length <= EK_ICERIK_SINIRI) return;
+
+  await fileService.dosyaSil(fileService.urlUret(altKlasor, dosya.filename));
+
+  throw ApiError.badRequest(
+    `Mesaj en fazla ${EK_ICERIK_SINIRI} karakter olabilir`,
+    "VALIDATION_ERROR"
+  );
+}
 
 // Ek gonderme oncesi ortak kontroller
 async function ekOncesiKontrol(userId, conversationId) {

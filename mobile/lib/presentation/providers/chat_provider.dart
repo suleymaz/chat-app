@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/conversation_model.dart';
 import '../../data/repositories/chat_repository.dart';
@@ -27,14 +28,33 @@ class SohbetListesiNotifier extends StateNotifier<AsyncValue<List<ConversationMo
     }
   }
 
+  Timer? _tazelemeZamanlayici;
+
   // Pull-to-refresh - loading gostermeden sessizce tazeler
   Future<void> tazele() async {
     try {
       final sohbetler = await _repo.sohbetleriGetir(arsivlenmis: arsivlenmis);
+      if (!mounted) return;
       state = AsyncValue.data(sohbetler);
     } catch (_) {
       // Tazeleme basarisiz olursa mevcut liste korunur
     }
+  }
+
+  // Socket olaylari icin: arka arkaya gelen mesajlarda liste her seferinde
+  // bastan cekiliyordu. Kisa bir pencerede gelen istekleri tek cagriya indiriyoruz.
+  void tazelemeIste() {
+    if (_tazelemeZamanlayici?.isActive ?? false) return;
+
+    _tazelemeZamanlayici = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) tazele();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tazelemeZamanlayici?.cancel();
+    super.dispose();
   }
 
   // Bir sohbetin okunmamis sayacini sifirlar

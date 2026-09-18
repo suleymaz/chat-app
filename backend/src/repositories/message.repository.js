@@ -23,23 +23,55 @@ export const mesajSelect = {
   },
 };
 
+// Imlec "ISO tarih|mesaj id" seklinde tutulur. Sadece tarihe bakmak, ayni
+// milisaniyede olusan mesajlarda sayfa sinirinda kayba yol aciyordu.
+export const imlecUret = (mesaj) => `${mesaj.createdAt.toISOString()}|${mesaj.id}`;
+
+const imleciCoz = (cursor) => {
+  if (!cursor) return null;
+
+  const [tarihMetni, id] = String(cursor).split("|");
+  const olusturulma = new Date(tarihMetni);
+
+  if (Number.isNaN(olusturulma.getTime())) return null;
+
+  return { olusturulma, id: id || null };
+};
+
 // Cursor tabanli sayfalama - eskiye dogru gider
-export const listeGetir = ({ conversationId, cursor, limit }) =>
-  prisma.message.findMany({
+export const listeGetir = ({ conversationId, cursor, limit }) => {
+  const imlec = imleciCoz(cursor);
+
+  return prisma.message.findMany({
     where: {
       conversationId,
-      ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {}),
+      ...(imlec
+        ? {
+            OR: [
+              { createdAt: { lt: imlec.olusturulma } },
+              ...(imlec.id
+                ? [{ createdAt: imlec.olusturulma, id: { lt: imlec.id } }]
+                : []),
+            ],
+          }
+        : {}),
     },
     select: mesajSelect,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit,
   });
-
-export const findById = (id) =>
-  prisma.message.findUnique({ where: id ? { id } : undefined, select: mesajSelect });
+};
 
 export const findByIdRaw = (id) =>
   prisma.message.findUnique({ where: { id } });
+
+// Karsi taraf sohbeti silmisse yeni mesajla birlikte sohbet ona geri gelir.
+// Aksi halde mesaj veritabanina yazilir ama alici onu hicbir zaman goremez.
+const katilimiCanlandir = (tx, conversationId, senderId) =>
+  tx.conversationParticipant.updateMany({
+    where: { conversationId, userId: { not: senderId }, deletedAt: { not: null } },
+    data: { deletedAt: null },
+  });
 
 // Mesaj gonderme - sohbet yoksa olusturulur, hepsi tek transaction icinde
 export const mesajOlustur = ({ conversationId, senderId, content, type = "TEXT" }) =>
@@ -53,6 +85,8 @@ export const mesajOlustur = ({ conversationId, senderId, content, type = "TEXT" 
       where: { id: conversationId },
       data: { lastMessageAt: mesaj.createdAt },
     });
+
+    await katilimiCanlandir(tx, conversationId, senderId);
 
     return mesaj;
   });
@@ -88,15 +122,32 @@ export const softDelete = (id) =>
     select: mesajSelect,
   });
 
-export const iletildiIsaretle = (conversationId, aliciId) =>
-  prisma.message.updateMany({
+// Iletilmemis mesajlari isaretler ve hangi id'lerin degistigini doner.
+// Gonderene tik bilgisini tam yayinlayabilmek icin id listesi gerekiyor.
+export const iletildiIsaretle = async (conversationId, aliciId) => {
+  const bekleyenler = await prisma.message.findMany({
     where: {
       conversationId,
       senderId: { not: aliciId },
       deliveredAt: null,
     },
-    data: { deliveredAt: new Date() },
+    select: { id: true },
   });
+
+  if (bekleyenler.length === 0) {
+    return { messageIds: [], deliveredAt: null };
+  }
+
+  const deliveredAt = new Date();
+  const messageIds = bekleyenler.map((m) => m.id);
+
+  await prisma.message.updateMany({
+    where: { id: { in: messageIds } },
+    data: { deliveredAt },
+  });
+
+  return { messageIds, deliveredAt };
+};
 
 export const okunduIsaretle = (conversationId, aliciId) =>
   prisma.message.updateMany({
@@ -150,6 +201,8 @@ export const ekliMesajOlustur = ({ conversationId, senderId, content, type, ek }
       where: { id: conversationId },
       data: { lastMessageAt: mesaj.createdAt },
     });
+
+    await katilimiCanlandir(tx, conversationId, senderId);
 
     return mesaj;
   });

@@ -9,6 +9,10 @@ import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/search/search_screen.dart';
 import '../../presentation/screens/chat/chat_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
+import '../../presentation/screens/home/archive_screen.dart';
+import '../../presentation/screens/profile/sifre_degistir_ekrani.dart';
+import '../../presentation/screens/settings/engellenenler_screen.dart';
+import '../../presentation/screens/settings/settings_screen.dart';
 
 class Rotalar {
   static const splash = '/';
@@ -18,6 +22,10 @@ class Rotalar {
   static const search = '/search';
   static const chat = '/chat';
   static const profile = '/profile';
+  static const archive = '/archive';
+  static const settings = '/settings';
+  static const changePassword = '/settings/password';
+  static const blocked = '/settings/blocked';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -76,6 +84,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           conversationId: state.pathParameters['id']!,
           userId: state.uri.queryParameters['userId'],
         ),
+      ),
+      GoRoute(
+        path: Rotalar.archive,
+        builder: (context, state) => const ArchiveScreen(),
+      ),
+      GoRoute(
+        path: Rotalar.settings,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Rotalar.changePassword,
+        builder: (context, state) => const SifreDegistirEkrani(),
+      ),
+      GoRoute(
+        path: Rotalar.blocked,
+        builder: (context, state) => const EngellenenlerScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

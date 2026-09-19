@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../core/config/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/medya_secici.dart';
 import '../../../core/utils/tarih_formatla.dart';
 import '../../../data/datasources/socket_service.dart';
 import '../../../data/models/message_model.dart';
@@ -17,6 +19,7 @@ import '../../widgets/gun_ayraci.dart';
 import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/mesaj_balonu.dart';
 import '../../widgets/yaziyor_gostergesi.dart';
+import 'gorsel_onizleme.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -30,12 +33,28 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _mesajController = TextEditingController();
-  final _scrollController = ScrollController();
+
+  // Belirli bir mesaja kaydirabilmek icin indeksle calisan liste kullaniyoruz;
+  // balon yukseklikleri degiskan oldugu icin piksel tahmini guvenilir degildi.
+  final _listeKontrol = ItemScrollController();
+  final _konumDinleyici = ItemPositionsListener.create();
 
   UserModel? _karsiTaraf;
   bool _karsiTarafYukleniyor = true;
   Timer? _yaziyorZamanlayici;
   bool _yaziyorGonderildi = false;
+
+  // Indirilmekte olan eklerin mesaj id'leri
+  final Set<String> _indirilenler = {};
+
+  // Arama durumu
+  bool _aramaAcik = false;
+  final _aramaController = TextEditingController();
+  Timer? _aramaDebounce;
+  List<String> _eslesmeler = [];
+  int _aktifEslesme = 0;
+  bool _aramaYukleniyor = false;
+  String? _vurgulananId;
 
   // dispose sirasinda ref kullanilamadigi icin servisi burada tutuyoruz
   late final SocketService _socketServis;
@@ -54,7 +73,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
 
     _socketServis = ref.read(socketServiceProvider);
-    _scrollController.addListener(_kaydirmaDinle);
+    _konumDinleyici.itemPositions.addListener(_konumDegisti);
     _mesajController.addListener(_yazmaDinle);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -78,17 +97,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     _yaziyorZamanlayici?.cancel();
+    _aramaDebounce?.cancel();
     _mesajController.removeListener(_yazmaDinle);
-    _scrollController.removeListener(_kaydirmaDinle);
-    _scrollController.dispose();
+    _konumDinleyici.itemPositions.removeListener(_konumDegisti);
+    _aramaController.dispose();
     _mesajController.dispose();
     super.dispose();
   }
 
-  // Liste ters oldugu icin "yukari kaydirma" maxScrollExtent'e yaklasmak demek
-  void _kaydirmaDinle() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
+  // Liste ters oldugu icin buyuk indeksler eski mesajlar demek.
+  // Listenin sonuna yaklasinca bir sonraki sayfayi yukluyoruz.
+  void _konumDegisti() {
+    final konumlar = _konumDinleyici.itemPositions.value;
+    if (konumlar.isEmpty) return;
+
+    final enBuyukIndeks = konumlar.map((k) => k.index).reduce((a, b) => a > b ? a : b);
+    final toplam = ref.read(mesajProvider(_param)).mesajlar.length;
+
+    if (toplam > 0 && enBuyukIndeks >= toplam - 3) {
       ref.read(mesajProvider(_param).notifier).eskileriYukle();
     }
   }
@@ -158,25 +184,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     ref.read(sohbetListesiProvider.notifier).tazele();
 
-    // Ilk mesajla sohbet olustuysa ekrani gercek sohbet id'sine tasiyoruz.
-    // Aksi halde ekran "yeni" anahtariyla acik kaliyor: socket olaylari farkli
-    // anahtarla geldigi icin bu ekrana ulasmiyor, sohbet odasina da
-    // katilinmadigi icin yaziyor gostergesi calismiyordu.
-    final olusanId = notifier.olusanSohbetId;
-
-    if (_yeniSohbet && olusanId != null && mounted) {
-      context.replace('${Rotalar.chat}/$olusanId');
-      return;
-    }
+    if (_sohbetOlustuysaTasi(notifier)) return;
 
     _enAltaKaydir();
   }
 
-  void _enAltaKaydir() {
-    if (!_scrollController.hasClients) return;
+  /// Ilk mesajla sohbet olustuysa ekrani gercek sohbet id'sine tasir.
+  /// Aksi halde ekran "yeni" anahtariyla acik kalir: socket olaylari farkli
+  /// anahtarla geldigi icin bu ekrana ulasmaz, sohbet odasina da katilinmaz.
+  bool _sohbetOlustuysaTasi(MesajNotifier notifier) {
+    final olusanId = notifier.olusanSohbetId;
 
-    _scrollController.animateTo(
-      0,
+    if (_yeniSohbet && olusanId != null && mounted) {
+      context.replace('${Rotalar.chat}/$olusanId');
+      return true;
+    }
+
+    return false;
+  }
+
+  void _enAltaKaydir() {
+    if (!_listeKontrol.isAttached) return;
+
+    _listeKontrol.scrollTo(
+      index: 0,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
     );
@@ -231,6 +262,349 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  void _uyari(String mesaj) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mesaj), backgroundColor: AppColors.error),
+    );
+  }
+
+  // Ataç menusu: galeri, kamera, dosya.
+  // Yeni sohbette de calisir; sohbet ilk ek ile birlikte olusur.
+  void _ekMenusu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              title: const Text('Galeriden sec'),
+              onTap: () {
+                Navigator.pop(context);
+                _gorselSec(galeriden: true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
+              title: const Text('Fotograf cek'),
+              onTap: () {
+                Navigator.pop(context);
+                _gorselSec(galeriden: false);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file, color: AppColors.primary),
+              title: const Text('Dosya gonder'),
+              onTap: () {
+                Navigator.pop(context);
+                _dosyaSec();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Yazi alanindaki metin varsa ekin aciklamasi olarak gonderilir
+  String? _aciklamaAl() {
+    final metin = _mesajController.text.trim();
+    if (metin.isEmpty) return null;
+
+    _mesajController.clear();
+    return metin;
+  }
+
+  Future<void> _gorselSec({required bool galeriden}) async {
+    try {
+      final yol = galeriden
+          ? await MedyaSecici.galeriden()
+          : await MedyaSecici.kameradan();
+
+      if (yol == null || !mounted) return;
+
+      final notifier = ref.read(mesajProvider(_param).notifier);
+      await notifier.gorselGonder(yol, icerik: _aciklamaAl());
+
+      if (!mounted) return;
+      ref.read(sohbetListesiProvider.notifier).tazele();
+
+      if (_sohbetOlustuysaTasi(notifier)) return;
+      _enAltaKaydir();
+    } catch (_) {
+      _uyari('Gorsel secilemedi');
+    }
+  }
+
+  Future<void> _dosyaSec() async {
+    try {
+      final dosya = await MedyaSecici.dosya();
+      if (dosya == null || !mounted) return;
+
+      final notifier = ref.read(mesajProvider(_param).notifier);
+      await notifier.dosyaGonder(
+        dosya.yol,
+        dosyaAdi: dosya.ad,
+        boyut: dosya.boyut,
+        icerik: _aciklamaAl(),
+      );
+
+      if (!mounted) return;
+      ref.read(sohbetListesiProvider.notifier).tazele();
+
+      if (_sohbetOlustuysaTasi(notifier)) return;
+      _enAltaKaydir();
+    } catch (_) {
+      _uyari('Dosya secilemedi');
+    }
+  }
+
+  // Gorsele dokununca tam ekran, dosyaya dokununca indirip acar
+  Future<void> _ekAc(MessageModel mesaj) async {
+    final ek = mesaj.attachments.isNotEmpty ? mesaj.attachments.first : null;
+
+    if (mesaj.type == MesajTipi.image) {
+      if (ek == null && mesaj.yerelDosyaYolu == null) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => GorselOnizleme(
+            url: ek?.url,
+            yerelYol: mesaj.yerelDosyaYolu,
+            baslik: mesaj.senderId == ref.read(authProvider).kullanici?.id
+                ? 'Sen'
+                : (_karsiTaraf?.fullName ?? 'Gorsel'),
+            tarih: mesaj.createdAt,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Henuz gonderilmemis dosya cihazda zaten duruyor
+    if (ek == null || ek.url.isEmpty) return;
+    if (_indirilenler.contains(mesaj.id)) return;
+
+    setState(() => _indirilenler.add(mesaj.id));
+
+    try {
+      final yol = await ref.read(dosyaIndiriciProvider).indir(
+            url: ek.url,
+            dosyaAdi: ek.fileName ?? 'dosya',
+            mesajId: mesaj.id,
+          );
+
+      final hata = await ref.read(dosyaIndiriciProvider).ac(yol);
+      if (hata != null) _uyari(hata);
+    } catch (_) {
+      _uyari('Dosya indirilemedi, baglantini kontrol et');
+    } finally {
+      if (mounted) setState(() => _indirilenler.remove(mesaj.id));
+    }
+  }
+
+  // --- Sohbet ici arama ---------------------------------------------------
+
+  void _aramayiAc() {
+    setState(() => _aramaAcik = true);
+  }
+
+  void _aramayiKapat() {
+    _aramaDebounce?.cancel();
+    _aramaController.clear();
+
+    setState(() {
+      _aramaAcik = false;
+      _eslesmeler = [];
+      _aktifEslesme = 0;
+      _aramaYukleniyor = false;
+      _vurgulananId = null;
+    });
+  }
+
+  void _aramaTerimiDegisti(String terim) {
+    _aramaDebounce?.cancel();
+
+    if (terim.trim().length < 2) {
+      setState(() {
+        _eslesmeler = [];
+        _aktifEslesme = 0;
+        _vurgulananId = null;
+      });
+      return;
+    }
+
+    _aramaDebounce = Timer(const Duration(milliseconds: 400), () => _ara(terim.trim()));
+  }
+
+  Future<void> _ara(String terim) async {
+    setState(() => _aramaYukleniyor = true);
+
+    try {
+      final sonuclar =
+          await ref.read(chatRepositoryProvider).mesajAra(widget.conversationId, terim);
+
+      if (!mounted) return;
+
+      setState(() {
+        // Sunucu yeniden eskiye siralar; ilk eslesme en yeni mesaj olur
+        _eslesmeler = sonuclar.map((m) => m.id).toList();
+        _aktifEslesme = 0;
+      });
+
+      if (_eslesmeler.isNotEmpty) {
+        await _eslesmeyeGit(0);
+      } else {
+        setState(() => _vurgulananId = null);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _eslesmeler = [];
+        _aktifEslesme = 0;
+      });
+      _uyari('Arama yapilamadi');
+    } finally {
+      if (mounted) setState(() => _aramaYukleniyor = false);
+    }
+  }
+
+  // Yukari tusu daha eskiye, asagi tusu daha yeniye gider
+  Future<void> _eslesmeDegistir(int yon) async {
+    if (_eslesmeler.isEmpty) return;
+
+    final yeni = _aktifEslesme + yon;
+    if (yeni < 0 || yeni >= _eslesmeler.length) return;
+
+    await _eslesmeyeGit(yeni);
+  }
+
+  Future<void> _eslesmeyeGit(int sira) async {
+    final mesajId = _eslesmeler[sira];
+    final notifier = ref.read(mesajProvider(_param).notifier);
+
+    // Mesaj henuz yuklenmemis olabilir; bulunana kadar eski sayfalar cekilir
+    final bulundu = await notifier.mesajaKadarYukle(mesajId);
+    if (!mounted) return;
+
+    if (!bulundu) {
+      _uyari('Mesaj yuklenemedi');
+      return;
+    }
+
+    final indeks =
+        ref.read(mesajProvider(_param)).mesajlar.indexWhere((m) => m.id == mesajId);
+
+    setState(() {
+      _aktifEslesme = sira;
+      _vurgulananId = mesajId;
+    });
+
+    if (indeks >= 0 && _listeKontrol.isAttached) {
+      _listeKontrol.scrollTo(
+        index: indeks,
+        alignment: 0.35,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  // Arama acikken baslik yerine metin alani gosterilir
+  PreferredSizeWidget _aramaBasligi() {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: _aramayiKapat,
+      ),
+      titleSpacing: 0,
+      title: TextField(
+        controller: _aramaController,
+        autofocus: true,
+        onChanged: _aramaTerimiDegisti,
+        textInputAction: TextInputAction.search,
+        decoration: const InputDecoration(
+          hintText: 'Bu sohbette ara',
+          border: InputBorder.none,
+          filled: false,
+          contentPadding: EdgeInsets.zero,
+        ),
+        style: const TextStyle(fontSize: 16),
+      ),
+      actions: [
+        if (_aramaController.text.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: () {
+              _aramaController.clear();
+              _aramaTerimiDegisti('');
+            },
+          ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(44),
+        child: _eslesmeCubugu(),
+      ),
+    );
+  }
+
+  Widget _eslesmeCubugu() {
+    final terimVar = _aramaController.text.trim().length >= 2;
+    final toplam = _eslesmeler.length;
+
+    String metin;
+    if (_aramaYukleniyor) {
+      metin = 'Araniyor...';
+    } else if (!terimVar) {
+      metin = 'En az 2 karakter yaz';
+    } else if (toplam == 0) {
+      metin = 'Sonuc bulunamadi';
+    } else {
+      metin = '${_aktifEslesme + 1}/$toplam';
+    }
+
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            metin,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: toplam == 0 && terimVar && !_aramaYukleniyor
+                  ? AppColors.textTertiary
+                  : AppColors.textSecondary,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_up),
+            tooltip: 'Onceki (daha eski)',
+            visualDensity: VisualDensity.compact,
+            color: AppColors.primary,
+            onPressed: _aktifEslesme < toplam - 1 ? () => _eslesmeDegistir(1) : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down),
+            tooltip: 'Sonraki (daha yeni)',
+            visualDensity: VisualDensity.compact,
+            color: AppColors.primary,
+            onPressed: _aktifEslesme > 0 ? () => _eslesmeDegistir(-1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final durum = ref.watch(mesajProvider(_param));
@@ -249,12 +623,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     return Scaffold(
-      appBar: _baslik(yaziyor),
+      appBar: _aramaAcik ? _aramaBasligi() : _baslik(yaziyor),
       body: Column(
         children: [
           Expanded(child: _mesajListesi(durum, benimId)),
-          if (yaziyor) const YaziyorGostergesi(),
-          _girisAlani(),
+          // Arama acikken yazma alani gizlenir, ekran aramaya odaklanir
+          if (!_aramaAcik) ...[
+            if (yaziyor) const YaziyorGostergesi(),
+            _girisAlani(),
+          ],
         ],
       ),
     );
@@ -268,6 +645,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return AppBar(
       titleSpacing: 0,
+      actions: [
+        if (!_yeniSohbet)
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Sohbette ara',
+            onPressed: _aramayiAc,
+          ),
+      ],
       title: _karsiTarafYukleniyor
           ? const Text('Yukleniyor...')
           : Row(
@@ -355,8 +740,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
-    return ListView.builder(
-      controller: _scrollController,
+    return ScrollablePositionedList.builder(
+      itemScrollController: _listeKontrol,
+      itemPositionsListener: _konumDinleyici,
       reverse: true,
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: durum.mesajlar.length + (durum.eskiYukleniyor ? 1 : 0),
@@ -377,6 +763,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
         final mesaj = durum.mesajlar[index];
         final benimMi = mesaj.senderId == benimId;
+        final vurgulu = mesaj.id == _vurgulananId;
 
         // Bir sonraki (daha eski) mesaj farkli gunde ise ayrac koy
         final sonraki = index + 1 < durum.mesajlar.length ? durum.mesajlar[index + 1] : null;
@@ -387,7 +774,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             MesajBalonu(
               mesaj: mesaj,
               benimMi: benimMi,
+              vurgulu: vurgulu,
+              indiriliyor: _indirilenler.contains(mesaj.id),
               onUzunBas: () => _mesajMenusu(mesaj),
+              onEkAc: () => _ekAc(mesaj),
               onTekrarDene: () =>
                   ref.read(mesajProvider(_param).notifier).tekrarGonder(mesaj.id),
             ),
@@ -416,6 +806,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+              tooltip: 'Ek gonder',
+              onPressed: _ekMenusu,
+            ),
             Expanded(
               child: TextField(
                 controller: _mesajController,

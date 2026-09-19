@@ -9,6 +9,7 @@ import '../../widgets/bos_durum.dart';
 import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/sohbet_satiri.dart';
 import '../../providers/socket_provider.dart';
+import '../../../data/models/conversation_model.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -39,6 +40,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const Text('Sohbetler'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.archive_outlined),
+            tooltip: 'Arsiv',
+            onPressed: () => context.push(Rotalar.archive),
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: 'Kullanici ara',
@@ -100,6 +106,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   benimId: benimId,
                   onTap: () => context.push('${Rotalar.chat}/${sohbet.id}'),
+                  onLongPress: () => _sohbetMenusu(sohbet),
                 );
               },
             ),
@@ -124,6 +131,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         icon: const Icon(Icons.refresh, size: 18),
         label: const Text('Tekrar dene'),
       ),
+    );
+  }
+
+  void _sohbetMenusu(ConversationModel sohbet) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                sohbet.user.fullName,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.archive_outlined),
+              title: const Text('Arsivle'),
+              onTap: () {
+                Navigator.pop(context);
+                _arsivle(sohbet);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text('Sohbeti sil', style: TextStyle(color: AppColors.error)),
+              onTap: () {
+                Navigator.pop(context);
+                _silmeOnayi(sohbet);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _silmeOnayi(ConversationModel sohbet) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sohbet silinsin mi?'),
+        content: Text(
+          '${sohbet.user.fullName} ile olan sohbet ve mesaj gecmisi sizin icin '
+          'silinecek. Karsi taraf sohbeti gormeye devam eder; tekrar yazisirsaniz '
+          'sohbet bos olarak yeniden baslar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vazgec'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _sil(sohbet);
+            },
+            child: const Text('Sil', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _arsivle(ConversationModel sohbet) async {
+    final basarili = await ref.read(sohbetListesiProvider.notifier).arsivle(sohbet.id, true);
+    if (!mounted) return;
+
+    if (!basarili) {
+      _uyari('Sohbet arsivlenemedi, baglantini kontrol et');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${sohbet.user.fullName} arsivlendi'),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'Geri al',
+          onPressed: () => _arsivdenCikar(sohbet),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _arsivdenCikar(ConversationModel sohbet) async {
+    final basarili = await ref.read(arsivListesiProvider.notifier).arsivle(sohbet.id, false);
+    if (!mounted) return;
+
+    if (!basarili) {
+      _uyari('Geri alinamadi, baglantini kontrol et');
+      return;
+    }
+
+    await ref.read(sohbetListesiProvider.notifier).tazele();
+  }
+
+  Future<void> _sil(ConversationModel sohbet) async {
+    final basarili = await ref.read(sohbetListesiProvider.notifier).sil(sohbet.id);
+    if (!mounted) return;
+
+    if (!basarili) {
+      _uyari('Sohbet silinemedi, baglantini kontrol et');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${sohbet.user.fullName} ile olan sohbet silindi'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _uyari(String mesaj) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mesaj), backgroundColor: AppColors.error),
     );
   }
 }

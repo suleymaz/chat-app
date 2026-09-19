@@ -481,3 +481,81 @@ atlama olabilirdi. (createdAt, id) bileşik imlecine geçtim.
 
 Sohbet listesi her sohbet için ayrı okunmamış sayısı sorgusu atıyordu (N+1). Tek groupBy
 ile topluca çekiyorum.
+
+
+## Gün 13 — Ekler, Profil ve Arama
+
+Sohbet listesine uzun basma menüsü ekledim: arşivle ve sil. Arşiv listesi için ayrı bir
+provider daha önce yazılmıştı ama hiç kullanılmamıştı, arşiv ekranını ona bağladım. Her iki işlem de sohbeti listeden anında çıkarıyor, sunucu yanıtı beklenmiyor.
+
+İlk yazdığımda iki eksik kalmıştı. Birincisi hata yönetimi: istek başarısız olursa kullanıcı
+hiçbir şey görmüyordu, üstelik çağrı await edilmediği için hata sessizce kayboluyordu.
+Notifier metotlarını bool döndürecek şekilde değiştirdim, ekran başarısızlıkta uyarı
+gösteriyor. İkincisi arşivden çıkarmadaki yarış: PATCH isteğini beklemeden ana listeyi
+tazeliyordum, sunucu henüz güncellenmediği için sohbet ana listede görünmüyordu. Arşivlemeye
+bir de "Geri al" aksiyonu koydum.
+
+Silme semantiğini değiştirdim. Gün 12 sonunda, silinen sohbetin yeni mesajla geri gelmesi
+için katılım kaydını canlandırıyordum; test ederken şunu gördüm: sohbeti siliyorum, karşı
+taraf yazıyor ve silmeden önceki bütün geçmiş geri geliyor. Beklediğim bu değildi. deletedAt
+artık bir bayrak değil kesme noktası: kullanıcı sohbette kalıyor ama o andan önceki mesajları
+görmüyor. erisimKontrol deletedAt'e bakıp 404 atmıyor, katılım kaydını döndürüyor; mesaj
+listesi, arama ve okundu işaretleme bu tarihten sonrasıyla sınırlanıyor. Sohbet listesindeki
+eleme JS tarafında yapılıyor, çünkü Prisma'da bir kaydın kendi alanını iç filtreyle
+karşılaştırmak mümkün değil — silinmiş katılım yalnızca sohbetin son mesajı kesme noktasından
+sonraysa listeye giriyor. Bunun bir yan faydası oldu: kendi sildiği sohbete tekrar yazan
+kullanıcı eskiden kendi mesajını bile göremiyordu, o da düzeldi.
+
+Okundu işaretlemesine de aynı sınırı uyguladım. Yoksa kullanıcı temizlediği sohbeti açtığında
+hiç görmediği eski mesajlar okundu sayılıyor ve karşı tarafta yanlış mavi tik çıkıyordu.
+
+Ataç butonunu ekledim: galeriden seç, fotoğraf çek, dosya gönder. İlk halinde yeni sohbette
+çalışmıyordu, çünkü backend'deki ek uçları var olan bir sohbet id'si istiyor. POST
+/messages/image ve /messages/file uçlarını ekledim — mevcut POST /messages kalıbının aynısı;
+sohbet yoksa sohbet, mesaj ve ek tek transaction içinde oluşuyor.
+
+Bu uçlarda alıcı id'si multipart gövdede geldiği için zod doğrulamasından geçmiyor, dosya
+diske yazıldıktan sonra serviste kontrol ediyorum. Önemli olan nokta şu: her hata yolunda
+(geçersiz id, engelli kullanıcı, kendine mesaj, kullanıcı bulunamadı) yüklenen dosyayı
+siliyorum. Aksi halde diskte hiçbir kayda bağlı olmayan dosyalar birikirdi.
+
+Görsel gönderimi de optimistic çalışıyor. MessageModel'e yerelDosyaYolu diye bir alan koydum;
+yerelDurum gibi sunucudan gelmiyor, sadece istemcide yaşıyor. Sunucu yanıtı gelene kadar
+balonda cihazdaki dosya Image.file ile gösteriliyor, yanıt gelince gerçek mesajla
+değiştiriliyor. Tam ekran görüntülemeyi InteractiveViewer ile yaptım, yakınlaştırma hazır
+geliyor.
+
+Dosyaları uygulamanın kendi belge klasörüne indirip open_filex ile sistem uygulamasına
+açtırıyorum. Kendi klasörüme yazdığım için Android'de de iOS'ta da ek depolama izni
+gerekmiyor. Aynı dosya ikinci kez indirilmiyor; dosya adının başına mesaj id'sini ekliyorum,
+aynı adlı iki ek birbirini ezmesin diye.
+
+Profil ekranında yalnızca değişen alanları gönderiyorum. Backend'deki şema en az bir alan
+istiyor, ayrıca tüm formu her seferinde göndermek kullanıcı adı hiç değişmediği halde
+"bu kullanıcı adı alınmış" kontrolünü tetikliyor.
+
+Şifre değiştirmede backend tüm refresh token'ları iptal ediyor. Bunu istemcide görmezden
+gelseydim access token'ın süresi dolduğu anda kullanıcı sebepsiz yere giriş ekranına
+düşerdi. Bunun yerine işlem başarılı olunca bilgilendirme gösterip çıkış yaptırıyorum.
+
+Ayarlar ekranına bildirim tercihleri, engellenenler listesi ve çıkış koydum; çıkışı profilden
+buraya taşıdım. Ayar değişiklikleri önce ekranda uygulanıyor, istek başarısız olursa uyarı
+çıkıyor. RadioListTile'ın groupValue/onChanged parametreleri kullandığım Flutter sürümünde
+kaldırılmış, üstteki RadioGroup widget'ına geçtim.
+
+Sohbet içi aramayı önce ayrı bir sayfa olarak yazdım, sonra WhatsApp'taki gibi olsun diye
+aynı sayfada çalışacak şekilde değiştirdim: arama ikonuna basınca başlık metin alanına
+dönüşüyor, altındaki çubukta "3/12" sayacı ve yukarı/aşağı okları duruyor, yazma alanı
+gizleniyor. Yukarı ok daha eskiye, aşağı ok daha yeniye gidiyor.
+
+Asıl uğraştığım kısım kaydırma oldu. Aranan mesaja gitmek için ortalama balon yüksekliğinden
+piksel tahmini yapıyordum, balon boyları değişken olduğu için hedefi ıskalıyordu.
+Scrollable.ensureVisible de çare değil, çünkü henüz çizilmemiş bir widget'ın context'i yok.
+scrollable_positioned_list paketine geçtim; indeksle kaydırdığı için ekranda olmayan mesaja
+da doğru gidiyor. Yan etkisi olarak ScrollController'ı bıraktım: eski mesaj yükleme
+tetikleyicisi artık piksel yerine görünen öğe indeksine bakıyor, son üç öğeye gelindiğinde
+sonraki sayfa çekiliyor. Aranan mesaj henüz yüklenmemişse bulunana kadar eski sayfalar
+çekiliyor, sonsuz döngüye girmesin diye 20 sayfa sınırı koydum.
+
+Sunucu aramada en fazla 50 sonuç döndürüyor, sayaç da bununla sınırlı. Çok uzun sohbetlerde
+eşleşme sayısı bunu aşabilir; şimdilik yeterli, gerekirse arama ucuna sayfalama eklenir.

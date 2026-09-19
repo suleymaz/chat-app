@@ -94,9 +94,16 @@ class ChatRepository {
     return MessageModel.fromJson(yanit.data['data'] as Map<String, dynamic>);
   }
 
-  Future<MessageModel> dosyaGonder(String conversationId, String dosyaYolu, {String? icerik}) async {
+  // dosyaAdi verilmezse sunucuya gecici dosyanin adi gider; secilen dosyanin
+  // gercek adini korumak icin acikca gonderiyoruz.
+  Future<MessageModel> dosyaGonder(
+    String conversationId,
+    String dosyaYolu, {
+    String? icerik,
+    String? dosyaAdi,
+  }) async {
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(dosyaYolu),
+      'file': await MultipartFile.fromFile(dosyaYolu, filename: dosyaAdi),
       if (icerik != null && icerik.isNotEmpty) 'content': icerik,
     });
 
@@ -108,15 +115,56 @@ class ChatRepository {
     return MessageModel.fromJson(yanit.data['data'] as Map<String, dynamic>);
   }
 
+  // Ilk mesaj gorsel oldugunda sohbet de bu istekte olusur
+  Future<({String? conversationId, MessageModel message})> yeniSohbetGorselGonder({
+    required String userId,
+    required String dosyaYolu,
+    String? icerik,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(dosyaYolu),
+      'userId': userId,
+      if (icerik != null && icerik.isNotEmpty) 'content': icerik,
+    });
+
+    final yanit = await _client.dio.post('/messages/image', data: formData);
+    return _yeniSohbetSonucu(yanit.data['data']);
+  }
+
+  // Ilk mesaj dosya oldugunda sohbet de bu istekte olusur
+  Future<({String? conversationId, MessageModel message})> yeniSohbetDosyaGonder({
+    required String userId,
+    required String dosyaYolu,
+    String? dosyaAdi,
+    String? icerik,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(dosyaYolu, filename: dosyaAdi),
+      'userId': userId,
+      if (icerik != null && icerik.isNotEmpty) 'content': icerik,
+    });
+
+    final yanit = await _client.dio.post('/messages/file', data: formData);
+    return _yeniSohbetSonucu(yanit.data['data']);
+  }
+
+  ({String? conversationId, MessageModel message}) _yeniSohbetSonucu(dynamic veri) {
+    return (
+      conversationId: veri['conversationId'] as String?,
+      message: MessageModel.fromJson(veri['message'] as Map<String, dynamic>),
+    );
+  }
+
   Future<MessageModel> mesajSil(String messageId) async {
     final yanit = await _client.dio.delete('/messages/$messageId');
     return MessageModel.fromJson(yanit.data['data'] as Map<String, dynamic>);
   }
 
+  // Eslesmeler arasinda gezinebilmek icin sunucunun izin verdigi en yuksek sayiyi aliyoruz
   Future<List<MessageModel>> mesajAra(String conversationId, String terim) async {
     final yanit = await _client.dio.get(
       '/conversations/$conversationId/messages/search',
-      queryParameters: {'q': terim},
+      queryParameters: {'q': terim, 'limit': 50},
     );
 
     return (yanit.data['data'] as List)

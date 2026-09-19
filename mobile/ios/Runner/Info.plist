@@ -4,6 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Sohbetlerde fotograf cekip gonderebilmek icin kamera erisimi gerekiyor.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Sohbetlerde fotograf gonderebilmek icin galeri erisimi gerekiyor.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

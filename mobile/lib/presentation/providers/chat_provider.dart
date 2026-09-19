@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/datasources/dosya_indirici.dart';
 import '../../data/models/conversation_model.dart';
 import '../../data/repositories/chat_repository.dart';
 import 'auth_provider.dart';
@@ -7,6 +8,9 @@ import 'auth_provider.dart';
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(ref.watch(apiClientProvider)),
 );
+
+// Mesaj eklerini indirip acan servis
+final dosyaIndiriciProvider = Provider<DosyaIndirici>((ref) => DosyaIndirici());
 
 class SohbetListesiNotifier extends StateNotifier<AsyncValue<List<ConversationModel>>> {
   final ChatRepository _repo;
@@ -74,6 +78,29 @@ class SohbetListesiNotifier extends StateNotifier<AsyncValue<List<ConversationMo
     if (mevcut == null) return;
 
     state = AsyncValue.data(mevcut.where((s) => s.id != conversationId).toList());
+  }
+
+  // Sohbeti arsivler veya arsivden cikarir.
+  // Istek basarisizsa liste degismez ve false doner; ekran kullaniciya haber verir.
+  Future<bool> arsivle(String conversationId, bool arsivlensinMi) async {
+    try {
+      await _repo.arsivle(conversationId, arsivlensinMi);
+      listedenCikar(conversationId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Sohbeti kullanicinin listesinden siler
+  Future<bool> sil(String conversationId) async {
+    try {
+      await _repo.sohbetSil(conversationId);
+      listedenCikar(conversationId);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }
 

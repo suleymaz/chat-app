@@ -55,6 +55,9 @@ class MessageModel {
   // Sadece istemci tarafinda kullanilir - optimistic UI icin
   final MesajDurumu? yerelDurum;
 
+  // Gonderilmeyi bekleyen ek, sunucudaki url yerine cihazdaki dosyadan gosterilir
+  final String? yerelDosyaYolu;
+
   MessageModel({
     required this.id,
     required this.conversationId,
@@ -67,6 +70,7 @@ class MessageModel {
     required this.createdAt,
     this.attachments = const [],
     this.yerelDurum,
+    this.yerelDosyaYolu,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -131,6 +135,7 @@ class MessageModel {
       createdAt: createdAt,
       attachments: attachments ?? this.attachments,
       yerelDurum: yerelDurum,
+      yerelDosyaYolu: yerelDosyaYolu,
     );
   }
 }

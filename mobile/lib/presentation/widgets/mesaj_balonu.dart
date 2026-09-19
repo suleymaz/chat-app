@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
@@ -9,6 +11,9 @@ class MesajBalonu extends StatelessWidget {
   final bool benimMi;
   final VoidCallback? onUzunBas;
   final VoidCallback? onTekrarDene;
+  final VoidCallback? onEkAc;
+  final bool indiriliyor;
+  final bool vurgulu;
 
   const MesajBalonu({
     super.key,
@@ -16,7 +21,13 @@ class MesajBalonu extends StatelessWidget {
     required this.benimMi,
     this.onUzunBas,
     this.onTekrarDene,
+    this.onEkAc,
+    this.indiriliyor = false,
+    this.vurgulu = false,
   });
+
+  // Gonderilmeyi bekleyen ekler cihazdaki dosyadan gosterilir
+  bool get _yerelEk => mesaj.yerelDosyaYolu != null && !mesaj.silinmis;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +49,7 @@ class MesajBalonu extends StatelessWidget {
           Flexible(
             child: GestureDetector(
               onLongPress: mesaj.silinmis ? null : onUzunBas,
+              onTap: mesaj.silinmis || mesaj.type == MesajTipi.text ? null : onEkAc,
               child: Container(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
@@ -46,7 +58,9 @@ class MesajBalonu extends StatelessWidget {
                     ? const EdgeInsets.all(4)
                     : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: benimMi ? AppColors.mesajGiden : AppColors.mesajGelen,
+                  color: vurgulu
+                      ? AppColors.primary.withValues(alpha: 0.18)
+                      : (benimMi ? AppColors.mesajGiden : AppColors.mesajGelen),
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(16),
                     topRight: const Radius.circular(16),
@@ -111,36 +125,40 @@ class MesajBalonu extends StatelessWidget {
 
   Widget _gorsel() {
     final ek = mesaj.attachments.isNotEmpty ? mesaj.attachments.first : null;
-    if (ek == null) return _metin();
+
+    // Gonderilmeyi bekleyen gorselde henuz sunucu adresi yok
+    if (ek == null && !_yerelEk) return _metin();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-                              child: CachedNetworkImage(
-            imageUrl: ek.url,
-            width: 220,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              width: 220,
-              height: 160,
-              color: AppColors.border,
-              child: const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+          child: _yerelEk
+              ? Image.file(
+                  File(mesaj.yerelDosyaYolu!),
+                  width: 220,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stack) => _gorselHatasi(),
+                )
+              : CachedNetworkImage(
+                  imageUrl: ek!.url,
+                  width: 220,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    width: 220,
+                    height: 160,
+                    color: AppColors.border,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => _gorselHatasi(),
                 ),
-              ),
-            ),
-            errorWidget: (context, url, error) => Container(
-              width: 220,
-              height: 160,
-              color: AppColors.border,
-              child: const Icon(Icons.broken_image_outlined, color: AppColors.textTertiary),
-            ),
-          ),
         ),
         if (mesaj.content != null && mesaj.content!.isNotEmpty) ...[
           const SizedBox(height: 6),
@@ -157,6 +175,15 @@ class MesajBalonu extends StatelessWidget {
           child: _saatVeDurum(),
         ),
       ],
+    );
+  }
+
+  Widget _gorselHatasi() {
+    return Container(
+      width: 220,
+      height: 160,
+      color: AppColors.border,
+      child: const Icon(Icons.broken_image_outlined, color: AppColors.textTertiary),
     );
   }
 
@@ -177,8 +204,16 @@ class MesajBalonu extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.insert_drive_file_outlined,
-                  size: 20, color: AppColors.primary),
+              child: indiriliyor
+                  ? const Padding(
+                      padding: EdgeInsets.all(11),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    )
+                  : const Icon(Icons.insert_drive_file_outlined,
+                      size: 20, color: AppColors.primary),
             ),
             const SizedBox(width: 10),
             Flexible(
@@ -196,9 +231,25 @@ class MesajBalonu extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  Text(
-                    ek.okunurBoyut,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        ek.okunurBoyut,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      // Gonderilmeyi bekleyen dosyada indirme ipucu gosterilmez
+                      if (!_yerelEk) ...[
+                        const Text(
+                          ' · ',
+                          style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                        ),
+                        Text(
+                          indiriliyor ? 'indiriliyor' : 'acmak icin dokun',
+                          style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

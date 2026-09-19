@@ -23,13 +23,15 @@ const mesajTemizle = (mesaj) => {
 };
 
 export const listele = async (userId, conversationId, { cursor, limit = 30 }) => {
-  await erisimKontrol(conversationId, userId);
+  const katilim = await erisimKontrol(conversationId, userId);
 
-  // Limitten bir fazla cekip devaminin olup olmadigini anliyoruz
+  // Limitten bir fazla cekip devaminin olup olmadigini anliyoruz.
+  // Sohbeti silmisse yalnizca silme anindan sonraki mesajlari gorur.
   const mesajlar = await messageRepo.listeGetir({
     conversationId,
     cursor,
     limit: limit + 1,
+    sonrasi: katilim.deletedAt,
   });
 
   const devamVar = mesajlar.length > limit;
@@ -149,9 +151,14 @@ export const sil = async (userId, messageId) => {
 };
 
 export const ara = async (userId, conversationId, { q, limit = 20 }) => {
-  await erisimKontrol(conversationId, userId);
+  const katilim = await erisimKontrol(conversationId, userId);
 
-  const mesajlar = await messageRepo.mesajAra({ conversationId, terim: q, limit });
+  const mesajlar = await messageRepo.mesajAra({
+    conversationId,
+    terim: q,
+    limit,
+    sonrasi: katilim.deletedAt,
+  });
 
   return mesajlar;
 };
@@ -217,21 +224,14 @@ export const gorselGonder = async (gonderen, conversationId, { content, dosya })
     return sahteMessaj({ conversationId, senderId: gonderen.id, content });
   }
 
-  const bilgi = await fileService.gorselIsle(dosya.path);
-  const url = fileService.urlUret("messages", bilgi.dosyaAdi);
+  const ek = await ekBilgisiHazirla({ tip: "IMAGE", altKlasor: "messages", dosya });
 
   const mesaj = await messageRepo.ekliMesajOlustur({
     conversationId,
     senderId: gonderen.id,
     content,
     type: "IMAGE",
-    ek: {
-      url,
-      mimeType: bilgi.mimeType,
-      sizeBytes: bilgi.sizeBytes,
-      width: bilgi.width,
-      height: bilgi.height,
-    },
+    ek,
   });
 
   await mesajIletimi(mesaj, karsiTarafId, gonderen, conversationId);
@@ -249,19 +249,14 @@ export const dosyaGonder = async (gonderen, conversationId, { content, dosya }) 
     return sahteMessaj({ conversationId, senderId: gonderen.id, content });
   }
 
-  const url = fileService.urlUret("files", dosya.filename);
+  const ek = await ekBilgisiHazirla({ tip: "FILE", altKlasor: "files", dosya });
 
   const mesaj = await messageRepo.ekliMesajOlustur({
     conversationId,
     senderId: gonderen.id,
     content,
     type: "FILE",
-    ek: {
-      url,
-      fileName: dosya.originalname,
-      mimeType: dosya.mimetype,
-      sizeBytes: dosya.size,
-    },
+    ek,
   });
 
   await mesajIletimi(mesaj, karsiTarafId, gonderen, conversationId);
@@ -272,6 +267,7 @@ export const dosyaGonder = async (gonderen, conversationId, { content, dosya }) 
 // Ek mesajlarin aciklama metni multipart govdede geldigi icin zod'dan gecmiyor.
 // Metin mesajlariyla ayni siniri burada uyguluyoruz; asarsa yuklenen dosya silinir.
 const EK_ICERIK_SINIRI = 4000;
+const UUID_DESENI = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function ekIcerikKontrol(content, altKlasor, dosya) {
   if (!content || content.length <= EK_ICERIK_SINIRI) return;
@@ -283,6 +279,116 @@ async function ekIcerikKontrol(content, altKlasor, dosya) {
     "VALIDATION_ERROR"
   );
 }
+
+// Yeni sohbet uclarinda alici id'si de multipart govdede geliyor, zod'dan gecmiyor
+async function ekAliciKontrol(aliciId, altKlasor, dosya) {
+  if (aliciId && UUID_DESENI.test(aliciId)) return;
+
+  await fileService.dosyaSil(fileService.urlUret(altKlasor, dosya.filename));
+
+  throw ApiError.badRequest("Gecersiz kullanici id", "VALIDATION_ERROR");
+}
+
+// Ilk mesaj gorsel veya dosya oldugunda sohbeti ekle birlikte olusturur.
+// Sohbet zaten varsa mevcut sohbete eklenir.
+async function yeniSohbetEkGonder(gonderen, { aliciId, content, dosya, tip, altKlasor }) {
+  await ekIcerikKontrol(content, altKlasor, dosya);
+  await ekAliciKontrol(aliciId, altKlasor, dosya);
+
+  const userId = gonderen.id;
+
+  const ekiSil = () => fileService.dosyaSil(fileService.urlUret(altKlasor, dosya.filename));
+
+  if (userId === aliciId) {
+    await ekiSil();
+    throw ApiError.badRequest("Kendinize mesaj gonderemezsiniz", "SELF_MESSAGE");
+  }
+
+  const alici = await userRepo.findById(aliciId);
+
+  if (!alici) {
+    await ekiSil();
+    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+  }
+
+  const engelli = await blockRepo.engelVarMi(userId, aliciId);
+
+  if (engelli) {
+    logger.info(`Engelli kullaniciya ek gonderme denemesi: ${userId} -> ${aliciId}`);
+    await ekiSil();
+    return {
+      conversationId: null,
+      message: sahteMessaj({ conversationId: null, senderId: userId, content }),
+    };
+  }
+
+  const ek = await ekBilgisiHazirla({ tip, altKlasor, dosya });
+  const mevcut = await conversationRepo.ikiliSohbetBul(userId, aliciId);
+
+  if (mevcut) {
+    const mesaj = await messageRepo.ekliMesajOlustur({
+      conversationId: mevcut.id,
+      senderId: userId,
+      content,
+      type: tip,
+      ek,
+    });
+
+    await mesajIletimi(mesaj, aliciId, gonderen, mevcut.id);
+    return { conversationId: mevcut.id, message: mesaj };
+  }
+
+  const { sohbet, mesaj } = await messageRepo.sohbetVeEkliMesajOlustur({
+    senderId: userId,
+    aliciId,
+    content,
+    type: tip,
+    ek,
+  });
+
+  await mesajIletimi(mesaj, aliciId, gonderen, sohbet.id);
+  return { conversationId: sohbet.id, message: mesaj };
+}
+
+// Gorseller kucultulup jpg'ye cevrilir, dosyalar oldugu gibi kaydedilir
+async function ekBilgisiHazirla({ tip, altKlasor, dosya }) {
+  if (tip === "IMAGE") {
+    const bilgi = await fileService.gorselIsle(dosya.path);
+
+    return {
+      url: fileService.urlUret(altKlasor, bilgi.dosyaAdi),
+      mimeType: bilgi.mimeType,
+      sizeBytes: bilgi.sizeBytes,
+      width: bilgi.width,
+      height: bilgi.height,
+    };
+  }
+
+  return {
+    url: fileService.urlUret(altKlasor, dosya.filename),
+    fileName: dosya.originalname,
+    mimeType: dosya.mimetype,
+    sizeBytes: dosya.size,
+  };
+}
+
+export const yeniSohbetGorselGonder = (gonderen, { userId, content, dosya }) =>
+  yeniSohbetEkGonder(gonderen, {
+    aliciId: userId,
+    content,
+    dosya,
+    tip: "IMAGE",
+    altKlasor: "messages",
+  });
+
+export const yeniSohbetDosyaGonder = (gonderen, { userId, content, dosya }) =>
+  yeniSohbetEkGonder(gonderen, {
+    aliciId: userId,
+    content,
+    dosya,
+    tip: "FILE",
+    altKlasor: "files",
+  });
 
 // Ek gonderme oncesi ortak kontroller
 async function ekOncesiKontrol(userId, conversationId) {

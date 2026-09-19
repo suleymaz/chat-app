@@ -5,11 +5,21 @@ import * as userRepo from "../repositories/user.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 import * as emitters from "../sockets/emitters.js";
 
-// Kullanicinin sohbete erisim yetkisi var mi kontrol eder
+// Iki tarihten sonrakini doner - null degerler yok sayilir
+const enGecTarih = (a, b) => {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  return a > b ? a : b;
+};
+
+// Kullanicinin sohbete erisim yetkisi var mi kontrol eder.
+// deletedAt "sohbeti sildigi an"dir, katilimi sonlandirmaz: kullanici sohbette
+// kalir ama o andan onceki mesajlari goremez. Donen katilim kaydindaki
+// deletedAt, mesaj sorgularinda kesme noktasi olarak kullanilir.
 const erisimKontrol = async (conversationId, userId) => {
   const katilim = await conversationRepo.katilimBul(conversationId, userId);
 
-  if (!katilim || katilim.deletedAt) {
+  if (!katilim) {
     throw ApiError.notFound("Sohbet bulunamadi", "CONVERSATION_NOT_FOUND");
   }
 
@@ -18,12 +28,24 @@ const erisimKontrol = async (conversationId, userId) => {
 
 // Sohbet listesi - her sohbet icin son mesaj, okunmamis sayisi ve karsi kullanici
 export const listele = async (userId, { archived = false } = {}) => {
-  const katilimlar = await conversationRepo.listeGetir(userId, { arsivlenmis: archived });
+  const tumKatilimlar = await conversationRepo.listeGetir(userId, { arsivlenmis: archived });
 
-  // Okunmamis sayilari tek sorguda gelir - sohbet basina ayri count atmiyoruz
+  // Silinmis sohbetler yalnizca silme anindan sonra mesaj geldiyse listede yer alir
+  const katilimlar = tumKatilimlar.filter((katilim) => {
+    if (!katilim.deletedAt) return true;
+
+    const sonMesaj = katilim.conversation.messages[0];
+    return sonMesaj != null && sonMesaj.createdAt > katilim.deletedAt;
+  });
+
+  // Okunmamis sayilari tek sorguda gelir - sohbet basina ayri count atmiyoruz.
+  // Esik, okundu bilgisi ile silme ani arasindaki en gec tarihtir.
   const okunmamisHarita = await conversationRepo.okunmamisSayilari(
     userId,
-    katilimlar.map((k) => ({ conversationId: k.conversationId, lastReadAt: k.lastReadAt }))
+    katilimlar.map((k) => ({
+      conversationId: k.conversationId,
+      lastReadAt: enGecTarih(k.lastReadAt, k.deletedAt),
+    }))
   );
 
   return katilimlar.map((katilim) => {
@@ -91,10 +113,10 @@ export const kullaniciylaSohbet = async (userId, digerUserId) => {
 };
 
 export const okunduIsaretle = async (userId, conversationId) => {
-  await erisimKontrol(conversationId, userId);
+  const katilim = await erisimKontrol(conversationId, userId);
 
   await conversationRepo.okunduIsaretle(conversationId, userId);
-  await messageRepo.okunduIsaretle(conversationId, userId);
+  await messageRepo.okunduIsaretle(conversationId, userId, katilim.deletedAt);
 
 
   // Karsi tarafa mesajlarinin okundugunu bildir

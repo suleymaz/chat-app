@@ -45,3 +45,23 @@ export const dosyaGonder = asyncHandler(async (req, res) => {
   });
   created(res, mesaj);
 });
+
+// Ilk mesaji gorsel olarak gonderip sohbeti baslatir
+export const yeniSohbetGorsel = asyncHandler(async (req, res) => {
+  const sonuc = await messageService.yeniSohbetGorselGonder(req.user, {
+    userId: req.body.userId,
+    content: req.body.content,
+    dosya: req.file,
+  });
+  created(res, sonuc);
+});
+
+// Ilk mesaji dosya olarak gonderip sohbeti baslatir
+export const yeniSohbetDosya = asyncHandler(async (req, res) => {
+  const sonuc = await messageService.yeniSohbetDosyaGonder(req.user, {
+    userId: req.body.userId,
+    content: req.body.content,
+    dosya: req.file,
+  });
+  created(res, sonuc);
+});

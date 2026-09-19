@@ -87,7 +87,7 @@ const baglantiKur = async (socket) => {
 
     const katilim = await conversationRepo.katilimBul(conversationId, userId);
 
-    if (!katilim || katilim.deletedAt) {
+    if (!katilim) {
       logger.warn(`Yetkisiz sohbet odasi denemesi: ${username} -> ${conversationId}`);
       return;
     }

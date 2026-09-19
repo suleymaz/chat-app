@@ -38,13 +38,16 @@ const imleciCoz = (cursor) => {
   return { olusturulma, id: id || null };
 };
 
-// Cursor tabanli sayfalama - eskiye dogru gider
-export const listeGetir = ({ conversationId, cursor, limit }) => {
+// Cursor tabanli sayfalama - eskiye dogru gider.
+// "sonrasi" kullanicinin sohbeti sildigi andir; o andan onceki mesajlar
+// bu kullanici icin artik yoktur (bkz. conversation.service.erisimKontrol).
+export const listeGetir = ({ conversationId, cursor, limit, sonrasi = null }) => {
   const imlec = imleciCoz(cursor);
 
   return prisma.message.findMany({
     where: {
       conversationId,
+      ...(sonrasi ? { createdAt: { gt: sonrasi } } : {}),
       ...(imlec
         ? {
             OR: [
@@ -65,14 +68,6 @@ export const listeGetir = ({ conversationId, cursor, limit }) => {
 export const findByIdRaw = (id) =>
   prisma.message.findUnique({ where: { id } });
 
-// Karsi taraf sohbeti silmisse yeni mesajla birlikte sohbet ona geri gelir.
-// Aksi halde mesaj veritabanina yazilir ama alici onu hicbir zaman goremez.
-const katilimiCanlandir = (tx, conversationId, senderId) =>
-  tx.conversationParticipant.updateMany({
-    where: { conversationId, userId: { not: senderId }, deletedAt: { not: null } },
-    data: { deletedAt: null },
-  });
-
 // Mesaj gonderme - sohbet yoksa olusturulur, hepsi tek transaction icinde
 export const mesajOlustur = ({ conversationId, senderId, content, type = "TEXT" }) =>
   prisma.$transaction(async (tx) => {
@@ -85,8 +80,6 @@ export const mesajOlustur = ({ conversationId, senderId, content, type = "TEXT" 
       where: { id: conversationId },
       data: { lastMessageAt: mesaj.createdAt },
     });
-
-    await katilimiCanlandir(tx, conversationId, senderId);
 
     return mesaj;
   });
@@ -104,6 +97,45 @@ export const sohbetVeMesajOlustur = ({ senderId, aliciId, content, type = "TEXT"
 
     const mesaj = await tx.message.create({
       data: { conversationId: sohbet.id, senderId, content, type },
+      select: mesajSelect,
+    });
+
+    await tx.conversation.update({
+      where: { id: sohbet.id },
+      data: { lastMessageAt: mesaj.createdAt },
+    });
+
+    return { sohbet, mesaj };
+  });
+
+// Sohbeti ve ilk mesaji ek ile birlikte olusturur - ilk mesaj gorsel/dosya oldugunda
+export const sohbetVeEkliMesajOlustur = ({ senderId, aliciId, content, type, ek }) =>
+  prisma.$transaction(async (tx) => {
+    const sohbet = await tx.conversation.create({
+      data: {
+        participants: {
+          create: [{ userId: senderId }, { userId: aliciId }],
+        },
+      },
+    });
+
+    const mesaj = await tx.message.create({
+      data: {
+        conversationId: sohbet.id,
+        senderId,
+        content: content || null,
+        type,
+        attachments: {
+          create: {
+            url: ek.url,
+            fileName: ek.fileName ?? null,
+            mimeType: ek.mimeType,
+            sizeBytes: ek.sizeBytes,
+            width: ek.width ?? null,
+            height: ek.height ?? null,
+          },
+        },
+      },
       select: mesajSelect,
     });
 
@@ -149,22 +181,26 @@ export const iletildiIsaretle = async (conversationId, aliciId) => {
   return { messageIds, deliveredAt };
 };
 
-export const okunduIsaretle = (conversationId, aliciId) =>
+// Silinen sohbette, silme anindan onceki mesajlar okunmus sayilmaz:
+// kullanici onlari goremiyor, karsi tarafta yanlis "okundu" tiki cikmasin.
+export const okunduIsaretle = (conversationId, aliciId, sonrasi = null) =>
   prisma.message.updateMany({
     where: {
       conversationId,
       senderId: { not: aliciId },
       readAt: null,
+      ...(sonrasi ? { createdAt: { gt: sonrasi } } : {}),
     },
     data: { readAt: new Date() },
   });
 
-// Sohbet icinde mesaj arama
-export const mesajAra = ({ conversationId, terim, limit }) =>
+// Sohbet icinde mesaj arama - silme sonrasi mesajlarla sinirli
+export const mesajAra = ({ conversationId, terim, limit, sonrasi = null }) =>
   prisma.message.findMany({
     where: {
       conversationId,
       deletedAt: null,
+      ...(sonrasi ? { createdAt: { gt: sonrasi } } : {}),
       content: { contains: terim, mode: "insensitive" },
     },
     select: mesajSelect,
@@ -201,8 +237,6 @@ export const ekliMesajOlustur = ({ conversationId, senderId, content, type, ek }
       where: { id: conversationId },
       data: { lastMessageAt: mesaj.createdAt },
     });
-
-    await katilimiCanlandir(tx, conversationId, senderId);
 
     return mesaj;
   });

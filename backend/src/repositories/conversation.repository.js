@@ -41,12 +41,14 @@ export const katilimBul = (conversationId, userId) =>
     where: { conversationId_userId: { conversationId, userId } },
   });
 
-// Sohbet listesi - son mesaj ve okunmamis sayisi ile birlikte tek sorguda
+// Sohbet listesi - son mesaj ve okunmamis sayisi ile birlikte tek sorguda.
+// Silinmis sohbetler de gelir; silme anindan sonra mesaj gelip gelmedigine gore
+// eleme conversation.service.listele icinde yapilir (Prisma'da bir kaydin kendi
+// alanini ic filtreyle karsilastirmak mumkun degil).
 export const listeGetir = async (userId, { arsivlenmis = false }) => {
   const katilimlar = await prisma.conversationParticipant.findMany({
     where: {
       userId,
-      deletedAt: null,
       archivedAt: arsivlenmis ? { not: null } : null,
     },
     include: {

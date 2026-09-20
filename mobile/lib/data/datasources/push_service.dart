@@ -26,8 +26,23 @@ class PushService {
   String? _kayitliToken;
   StreamSubscription<String>? _tokenAbonelik;
   StreamSubscription<RemoteMessage>? _mesajAbonelik;
+  StreamSubscription<RemoteMessage>? _acilisAbonelik;
+
+  /// Bildirime dokunuldugunda ilgili sohbeti acar - main.dart tarafindan atanir
+  void Function(String conversationId)? sohbetAc;
+
+  /// Uygulama kapaliyken bildirime dokunulduysa sohbet id'si burada bekler.
+  /// Acilista yonlendirme yapilamaz (oturum henuz yuklenmemis olabilir),
+  /// bu yuzden oturum hazir olunca main.dart gelip aliyor.
+  String? _bekleyenSohbetId;
 
   bool get hazir => _hazir;
+
+  String? bekleyenSohbetIdAl() {
+    final id = _bekleyenSohbetId;
+    _bekleyenSohbetId = null;
+    return id;
+  }
 
   /// Uygulama acilisinda bir kez cagrilir
   Future<void> baslat() async {
@@ -46,9 +61,36 @@ class PushService {
     try {
       await _yerelBildirimiKur();
       _mesajAbonelik = FirebaseMessaging.onMessage.listen(_onPlandaGoster);
+
+      // Uygulama arka plandayken bildirime dokunulursa
+      _acilisAbonelik = FirebaseMessaging.onMessageOpenedApp.listen(_bildirimeDokunuldu);
+
+      // Uygulama tamamen kapaliyken bildirime dokunulup acildiysa
+      final acilisMesaji = await FirebaseMessaging.instance.getInitialMessage();
+      if (acilisMesaji != null) {
+        _bekleyenSohbetId = _sohbetIdCikar(acilisMesaji);
+      }
+
       _hazir = true;
     } catch (hata) {
       debugPrint('Bildirim kurulumu basarisiz: $hata');
+    }
+  }
+
+  // Backend bildirim verisinde conversationId gonderiyor
+  String? _sohbetIdCikar(RemoteMessage mesaj) {
+    final id = mesaj.data['conversationId'];
+    return (id is String && id.isNotEmpty) ? id : null;
+  }
+
+  void _bildirimeDokunuldu(RemoteMessage mesaj) {
+    final id = _sohbetIdCikar(mesaj);
+    if (id == null) return;
+
+    if (sohbetAc != null) {
+      sohbetAc!(id);
+    } else {
+      _bekleyenSohbetId = id;
     }
   }
 
@@ -59,9 +101,12 @@ class PushService {
     try {
       final izin = await FirebaseMessaging.instance.requestPermission();
 
-      if (izin.authorizationStatus == AuthorizationStatus.denied) {
-        debugPrint('Bildirim izni verilmedi');
-        return;
+      // Izin verilmediyse bildirim gorunmez ama token yine de kaydedilir:
+      // kullanici sistem ayarlarindan izni actiginda tekrar giris yapmak
+      // zorunda kalmasin. Izin bir kez reddedildikten sonra requestPermission
+      // bir daha pencere acmaz, bu yuzden burada durursak cihaz hic kaydolmaz.
+      if (izin.authorizationStatus != AuthorizationStatus.authorized) {
+        debugPrint('Bildirim izni durumu: ${izin.authorizationStatus}');
       }
 
       final token = await FirebaseMessaging.instance.getToken();
@@ -75,6 +120,13 @@ class PushService {
     } catch (hata) {
       debugPrint('FCM token kaydedilemedi: $hata');
     }
+  }
+
+  /// Uygulama one geldiginde cagrilir. Ilk denemede kaydedilemeyen token
+  /// (izin penceresi kapatilmis, sunucuya ulasilamamis) burada tekrar denenir.
+  Future<void> tokenKaydetGerekiyorsa() async {
+    if (_kayitliToken != null) return;
+    await tokenKaydet();
   }
 
   /// Cikis yaparken cagrilir - bu cihaza artik bildirim gitmemeli.
@@ -112,7 +164,20 @@ class PushService {
       iOS: DarwinInitializationSettings(),
     );
 
-    await _yerelBildirim.initialize(ayarlar);
+    // On plandaki bildirime dokunulunca payload'daki sohbet id'si ile aciliyor
+    await _yerelBildirim.initialize(
+      ayarlar,
+      onDidReceiveNotificationResponse: (yanit) {
+        final id = yanit.payload;
+        if (id == null || id.isEmpty) return;
+
+        if (sohbetAc != null) {
+          sohbetAc!(id);
+        } else {
+          _bekleyenSohbetId = id;
+        }
+      },
+    );
 
     const kanal = AndroidNotificationChannel(
       _kanalId,
@@ -144,11 +209,13 @@ class PushService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
+      payload: _sohbetIdCikar(mesaj),
     );
   }
 
   Future<void> temizle() async {
     await _tokenAbonelik?.cancel();
     await _mesajAbonelik?.cancel();
+    await _acilisAbonelik?.cancel();
   }
 }

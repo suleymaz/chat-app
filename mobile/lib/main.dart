@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/chat_provider.dart';
 import 'presentation/providers/socket_provider.dart';
 
 void main() async {
@@ -26,6 +27,9 @@ class ChatApp extends ConsumerStatefulWidget {
 class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
   Timer? _baglantiKontrol;
 
+  // Uygulama ekranda mi - arka planda socket'e baglanmamak icin takip ediliyor
+  bool _onPlanda = true;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +46,10 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
     ref.read(authProvider.notifier).cikisOncesi =
         () => ref.read(pushServiceProvider).tokenSil();
 
+    // Bildirime dokunulunca ilgili sohbet aciliyor. Oturum kapaliysa router
+    // zaten giris ekranina yonlendirir.
+    ref.read(pushServiceProvider).sohbetAc = _sohbeteGit;
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Firebase yapilandirilmamissa sessizce devre disi kalir
       await ref.read(pushServiceProvider).baslat();
@@ -53,12 +61,24 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
         ref.read(socketKoordinatorProvider).basla();
         await ref.read(socketServiceProvider).baglan();
         await ref.read(pushServiceProvider).tokenKaydet();
+
+        // Uygulama bildirime dokunularak acildiysa o sohbete git
+        final bekleyenSohbet = ref.read(pushServiceProvider).bekleyenSohbetIdAl();
+        if (bekleyenSohbet != null && mounted) {
+          _sohbeteGit(bekleyenSohbet);
+        }
       }
     });
 
     // Sunucu yeniden baslatilirsa veya ag kesilirse socket kopuyor.
     // Belirli araliklarla kontrol edip yeniden baglaniyoruz.
-        _baglantiKontrol = Timer.periodic(const Duration(seconds: 30), (_) {
+    _baglantiKontrol = Timer.periodic(const Duration(seconds: 30), (_) {
+      // Uygulama arka planda iken baglanmamali: backend bagli kullaniciya
+      // bildirim gondermiyor. Timer arka planda da calismaya devam ettigi icin
+      // bu kontrol olmazsa 30 saniye sonra socket geri geliyor ve kullanici
+      // bildirim alamaz hale geliyor.
+      if (!_onPlanda) return;
+
       final girisYapildi = ref.read(authProvider).durum == OturumDurumu.girisYapildi;
       if (!girisYapildi) return;
 
@@ -67,6 +87,18 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
         servis.baglan();
       }
     });
+  }
+
+  // Bildirimden gelen yonlendirme. Ayni sohbet zaten aciksa ustune ikinci bir
+  // kopyasini acmiyoruz: acilan yeni ekran ayni provider'i paylastigi icin
+  // mesajlari yeniden yuklemez, eski liste gorunur.
+  void _sohbeteGit(String conversationId) {
+    final router = ref.read(routerProvider);
+    final yol = '${Rotalar.chat}/$conversationId';
+
+    if (router.state.uri.path == yol) return;
+
+    router.push(yol);
   }
 
   @override
@@ -79,12 +111,25 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
   // Uygulama arka plana gecince socket kapanir, boylece backend FCM gonderir
   @override
   void didChangeAppLifecycleState(AppLifecycleState durum) {
+    // Bayrak oturumdan bagimsiz tutulmali, giris yapilmadan once de dogru olsun
+    if (durum == AppLifecycleState.resumed) _onPlanda = true;
+    if (durum == AppLifecycleState.paused || durum == AppLifecycleState.detached) {
+      _onPlanda = false;
+    }
+
     final girisYapildi = ref.read(authProvider).durum == OturumDurumu.girisYapildi;
     if (!girisYapildi) return;
 
     switch (durum) {
       case AppLifecycleState.resumed:
         ref.read(socketServiceProvider).baglan();
+
+        // Arka plandayken socket kapali oldugu icin gelen mesajlar listeye
+        // dusmemis olabilir; one gelince liste tazeleniyor.
+        ref.read(sohbetListesiProvider.notifier).tazelemeIste();
+
+        // Ilk acilista kaydedilemeyen FCM token'i icin ikinci sans
+        ref.read(pushServiceProvider).tokenKaydetGerekiyorsa();
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:

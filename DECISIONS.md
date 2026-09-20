@@ -559,3 +559,61 @@ sonraki sayfa çekiliyor. Aranan mesaj henüz yüklenmemişse bulunana kadar esk
 
 Sunucu aramada en fazla 50 sonuç döndürüyor, sayaç da bununla sınırlı. Çok uzun sohbetlerde
 eşleşme sayısı bunu aşabilir; şimdilik yeterli, gerekirse arama ucuna sayfalama eklenir.
+
+## Gün 14 — Bildirimler, Engelleme ve Socket Kararlılığı
+
+Firebase'i bağladım. Servis hesabı anahtarını koyup başlattığımda "Cannot read properties of
+undefined (reading 'cert')" hatası aldım — firebase-admin 13'ten itibaren ESM tarafında
+varsayılan dışa aktarımda credential ve messaging() ad alanları yok, modül bazlı API'ye
+geçilmiş. firebase-admin/app ve firebase-admin/messaging modüllerini kullanacak şekilde yeniden
+yazdım. Bu kodu Gün 7'de yazmıştım ama anahtar dosyası olmadığı için o satır ilk kez bugün
+çalıştı. Buradan çıkardığım ders: yapılandırmaya bağlı kod yolları, yapılandırma gelene kadar
+test edilmemiş sayılır.
+
+Bildirimler tek yönlü çalışıyordu, ikinci cihaz token'ını hiç göndermemişti. Sebep
+tokenKaydet'in izin durumu denied dönerse erken çıkmasıymış. Android 13'te bildirim izni
+penceresi bir kez çıkıyor, reddedildikten sonra bir daha açılmıyor ve hep denied dönüyor —
+kullanıcı izni ayarlardan açsa bile cihaz kaydolmuyordu. Oysa token izinden bağımsız, izin
+sadece bildirimin görünmesini etkiliyor. Artık izin verilmemiş olsa da token kaydediliyor.
+
+Bildirimlerin bazen gelip bazen gelmemesinin sebebi main.dart'taki 30 saniyelik yeniden
+bağlanma timer'ıymış. Uygulama arka plana geçince socket'i kapatıyorum ki backend FCM
+göndersin, ama timer arka planda da çalışıp socket'i geri bağlıyordu. Bağlantı geri gelince
+backend bildirimi atlıyor, mesaj socket üzerinden arka plandaki uygulamaya düşüyor ve hiçbir
+şey görünmüyordu. Timer artık yaşam döngüsü bayrağına bakıyor.
+
+Bildirime dokunup sohbet açıldığında yeni mesaj görünmüyordu. MesajNotifier'a tazele() ekledim
+— ilkYukleme'den farkı, yüklenmiş eski sayfaları ve gönderilememiş yerel mesajları koruması,
+ekranın bir an boşalmaması. Sohbet ekranı socket bağlantı durumunu dinliyor, bağlantı geri
+kurulunca odaya yeniden katılıp listeyi tazeliyor. Odaya yeniden katılmak önemliydi, sunucuda
+oda üyeliği kopunca siliniyor ve yazıyor göstergesi sessizce çalışmaz hale geliyor.
+
+Günün en uğraştırıcı hatası 30 saniyede bir tekrarlayan "Socket auth başarısız: jwt expired"
+uyarılarıydı. Loga kullanıcı id'si, IP ve token'ın ne kadar önce dolduğunu ekleyince gördüm:
+aynı saniye içinde hem başarılı bir refresh hem de 52 dakika önce süresi dolmuş bir token'la
+başarısız el sıkışma var. Sebep socket_io_client'ın Manager önbelleğiymiş — io.io() her çağrıda
+yeni bağlantı kurmuyor, host anahtarıyla Manager'ı önbelleğe alıyor ve o Manager oluşturulduğu
+andaki token'ı taşıyor. dispose() sadece socket'i kapatıyor, Manager'ın yeniden bağlanma
+döngüsü ayakta kalıyor. enableForceNew ile önbelleği kapattım, kapatmayı Manager'ı da kapatacak
+şekilde yazdım. Bu hatanın sonucu ağırdı: uygulama 15 dakikadan uzun açık kalınca gerçek
+zamanlı mesajlaşma sessizce ölüyordu.
+
+Sunucu yeniden başladığında bağlı kullanıcıların isOnline alanı sonsuza kadar açık kalıyordu,
+disconnect olayı hiç işlenmediği için. Açılışta bu alanı sıfırlıyorum.
+
+Engelleme uçları eksiksizdi ama arayüzde engelleyecek bir yer yoktu. Sohbet başlığına menü
+ekledim. Detay yanıtına isBlocked koyarken bilerek findByPair kullandım, engelVarMi değil —
+ikincisi çift yönlü çalışıyor, onu kullansaydım karşı taraf beni engellediğinde de true döner
+ve kullanıcı engellendiğini anlardı.
+
+Sessize alma da benzer durumdaydı: isMuted şemada vardı, backend bildirim kararında okuyordu,
+ikonu çiziliyordu — ama alanı true yapan hiçbir kod yolu yoktu. PATCH /conversations/:id/mute
+ucunu ekledim.
+
+Doğrulama katmanında bir açık buldum: Zod şemalarında .min(1).trim() sıralaması yanlıştı,
+uzunluk kontrolü kırpmadan önce çalıştığı için sadece boşluktan oluşan mesaj geçerli sayılıp
+boş kaydediliyordu. Altı yerde aynı hata vardı, .trim().min(1) olarak düzelttim.
+
+Son görülme bilgisi yanlış çalışıyordu. Sunucu tarihi gönderiyordu ama cevrimiciProvider'ın
+durumu Map<String, bool> olduğu için tutacak yer yoktu. Çevrimiçi bilgisiyle tarihi birlikte
+tutan bir nesneye çevirdim.

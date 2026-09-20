@@ -128,6 +128,13 @@ export const arsivle = (conversationId, userId, arsivle) =>
     data: { archivedAt: arsivle ? new Date() : null },
   });
 
+// Sessize alinan sohbet icin bildirim gonderilmez, mesaj normal sekilde iletilir
+export const sessizeAl = (conversationId, userId, sessiz) =>
+  prisma.conversationParticipant.update({
+    where: { conversationId_userId: { conversationId, userId } },
+    data: { isMuted: sessiz },
+  });
+
 export const sohbetiSil = (conversationId, userId) =>
   prisma.conversationParticipant.update({
     where: { conversationId_userId: { conversationId, userId } },

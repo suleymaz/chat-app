@@ -30,9 +30,9 @@ export const mesajGonderSchema = z.object({
   body: z.object({
     content: z
       .string()
+      .trim()
       .min(1, "Mesaj bos olamaz")
-      .max(4000, "Mesaj en fazla 4000 karakter olabilir")
-      .trim(),
+      .max(4000, "Mesaj en fazla 4000 karakter olabilir"),
   }),
 });
 
@@ -41,9 +41,9 @@ export const yeniSohbetMesajSchema = z.object({
     userId: z.string().uuid("Gecersiz kullanici id"),
     content: z
       .string()
+      .trim()
       .min(1, "Mesaj bos olamaz")
-      .max(4000, "Mesaj en fazla 4000 karakter olabilir")
-      .trim(),
+      .max(4000, "Mesaj en fazla 4000 karakter olabilir"),
   }),
 });
 
@@ -58,7 +58,7 @@ export const mesajAraSchema = z.object({
     id: z.string().uuid("Gecersiz sohbet id"),
   }),
   query: z.object({
-    q: z.string().min(2, "Arama terimi en az 2 karakter olmali").trim(),
+    q: z.string().trim().min(2, "Arama terimi en az 2 karakter olmali"),
     limit: z.coerce.number().min(1).max(50).default(20).optional(),
   }),
 });
@@ -69,5 +69,14 @@ export const arsivSchema = z.object({
   }),
   body: z.object({
     archived: z.boolean(),
+  }),
+});
+
+export const sessizSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Gecersiz sohbet id"),
+  }),
+  body: z.object({
+    muted: z.boolean(),
   }),
 });

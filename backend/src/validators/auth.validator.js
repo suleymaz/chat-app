@@ -21,9 +21,9 @@ export const registerSchema = z.object({
       .regex(/^\+90[0-9]{10}$/, 'Telefon numarasi +905XXXXXXXXX formatinda olmali'),
     fullName: z
       .string()
+      .trim()
       .min(2, 'Ad soyad en az 2 karakter olmali')
-      .max(100, 'Ad soyad en fazla 100 karakter olabilir')
-      .trim(),
+      .max(100, 'Ad soyad en fazla 100 karakter olabilir'),
     password: passwordSchema,
   }),
 });

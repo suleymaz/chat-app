@@ -5,9 +5,9 @@ export const updateProfileSchema = z.object({
     .object({
       fullName: z
         .string()
+        .trim()
         .min(2, "Ad soyad en az 2 karakter olmali")
         .max(100, "Ad soyad en fazla 100 karakter olabilir")
-        .trim()
         .optional(),
       username: z
         .string()
@@ -39,7 +39,7 @@ export const changePasswordSchema = z.object({
 
 export const searchSchema = z.object({
   query: z.object({
-    q: z.string().min(2, "Arama terimi en az 2 karakter olmali").trim(),
+    q: z.string().trim().min(2, "Arama terimi en az 2 karakter olmali"),
     limit: z.coerce.number().min(1).max(50).default(20).optional(),
   }),
 });

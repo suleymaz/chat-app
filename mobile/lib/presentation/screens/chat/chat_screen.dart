@@ -41,6 +41,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   UserModel? _karsiTaraf;
   bool _karsiTarafYukleniyor = true;
+
+  // Karsi tarafi biz engelledik mi - engellediysek yazma alani kapaniyor.
+  // Karsi tarafin bizi engelleyip engellemedigini sunucu bildirmiyor.
+  bool _engellendi = false;
+  bool _engelIslemde = false;
+
+  // Sessize alinan sohbette mesajlar gelir, sadece bildirim cikmaz
+  bool _sessiz = false;
   Timer? _yaziyorZamanlayici;
   bool _yaziyorGonderildi = false;
 
@@ -158,12 +166,120 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       } else {
         final detay =
             await ref.read(chatRepositoryProvider).sohbetDetay(widget.conversationId);
-        if (mounted) setState(() => _karsiTaraf = detay);
+        if (mounted) {
+          setState(() {
+            _karsiTaraf = detay.kullanici;
+            _engellendi = detay.engellendi;
+            _sessiz = detay.sessiz;
+          });
+        }
       }
     } catch (_) {
       // Karsi taraf yuklenemezse baslikta varsayilan metin gosterilir
     } finally {
       if (mounted) setState(() => _karsiTarafYukleniyor = false);
+    }
+  }
+
+  // Sessize alma geri alinabilir bir tercih, onay sormuyoruz.
+  // Once ekrani guncelleyip sonra sunucuya gidiyoruz; hata olursa geri aliniyor.
+  Future<void> _sessizDegistir() async {
+    final yeniDurum = !_sessiz;
+    setState(() => _sessiz = yeniDurum);
+
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .sessizeAl(widget.conversationId, yeniDurum);
+
+      if (!mounted) return;
+
+      // Sohbet listesindeki sessiz ikonu da guncellensin
+      ref.read(sohbetListesiProvider.notifier).tazele();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(yeniDurum ? 'Sohbet sessize alindi' : 'Sohbetin sesi acildi'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _sessiz = !yeniDurum);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Islem tamamlanamadi, baglantini kontrol et'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  // Engelleme onay istiyor, engel kaldirma dogrudan yapiliyor
+  Future<void> _engelDegistir() async {
+    final kullanici = _karsiTaraf;
+    if (kullanici == null || _engelIslemde) return;
+
+    if (!_engellendi) {
+      final onay = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('${kullanici.fullName} engellensin mi?'),
+          content: const Text(
+            'Engellenen kullanici sana mesaj gonderemez, '
+            'cevrimici durumunu ve profilini goremez. '
+            'Bu islemi istedigin zaman geri alabilirsin.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgec'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Engelle'),
+            ),
+          ],
+        ),
+      );
+
+      if (onay != true) return;
+    }
+
+    setState(() => _engelIslemde = true);
+
+    try {
+      final repo = ref.read(userRepositoryProvider);
+
+      if (_engellendi) {
+        await repo.engelKaldir(kullanici.id);
+      } else {
+        await repo.engelle(kullanici.id);
+      }
+
+      if (!mounted) return;
+      setState(() => _engellendi = !_engellendi);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _engellendi
+                ? '${kullanici.fullName} engellendi'
+                : '${kullanici.fullName} icin engel kaldirildi',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Islem tamamlanamadi, baglantini kontrol et'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _engelIslemde = false);
     }
   }
 
@@ -611,6 +727,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final benimId = ref.watch(authProvider).kullanici?.id ?? '';
     final yaziyor = ref.watch(yaziyorProvider)[widget.conversationId] ?? false;
 
+    // Uygulama arka plana gecince socket kapaniyor, o sirada gelen mesajlar
+    // ekrana dusmuyor. Baglanti geri kurulunca odaya tekrar katilip listeyi
+    // tazeliyoruz - sunucu yeniden baslatildiginda da ayni yol calisiyor.
+    ref.listen(socketBagliProvider, (onceki, yeni) {
+      if (onceki?.value != false || yeni.value != true || _yeniSohbet) return;
+
+      _socketServis.sohbeteKatil(widget.conversationId);
+      ref.read(mesajProvider(_param).notifier).tazele();
+      ref.read(mesajProvider(_param).notifier).okunduIsaretle();
+      ref.read(sohbetListesiProvider.notifier).okunduIsaretle(widget.conversationId);
+    });
+
     // Sohbet ekrani acikken gelen mesajlar hemen okundu isaretlenir
     ref.listen(mesajProvider(_param), (onceki, yeni) {
       final oncekiSayi = onceki?.mesajlar.length ?? 0;
@@ -629,19 +757,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(child: _mesajListesi(durum, benimId)),
           // Arama acikken yazma alani gizlenir, ekran aramaya odaklanir
           if (!_aramaAcik) ...[
-            if (yaziyor) const YaziyorGostergesi(),
-            _girisAlani(),
+            if (_engellendi)
+              _engelSeridi()
+            else ...[
+              if (yaziyor) const YaziyorGostergesi(),
+              _girisAlani(),
+            ],
           ],
         ],
       ),
     );
   }
 
+  // Engellenen kullaniciya mesaj yazilamaz, yazma alaninin yerini bu serit alir
+  Widget _engelSeridi() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Bu kullaniciyi engelledin',
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: _engelIslemde ? null : _engelDegistir,
+              child: Text(_engelIslemde ? 'Kaldiriliyor...' : 'Engeli kaldir'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   PreferredSizeWidget _baslik(bool yaziyor) {
     final cevrimiciHarita = ref.watch(cevrimiciProvider);
-    final cevrimici = _karsiTaraf != null
-        ? (cevrimiciHarita[_karsiTaraf!.id] ?? _karsiTaraf!.isOnline)
-        : false;
+    final durum = _karsiTaraf != null ? cevrimiciHarita[_karsiTaraf!.id] : null;
+
+    final cevrimici = durum?.cevrimici ?? _karsiTaraf?.isOnline ?? false;
+
+    // Karsi taraf ekran acikken cevrimdisi olursa son gorulme socket'ten gelir.
+    // Ekran acilisindaki deger ise sadece ilk gosterim icin.
+    final sonGorulme = durum?.lastSeenAt ?? _karsiTaraf?.lastSeenAt;
 
     return AppBar(
       titleSpacing: 0,
@@ -651,6 +817,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             icon: const Icon(Icons.search),
             tooltip: 'Sohbette ara',
             onPressed: _aramayiAc,
+          ),
+        if (!_yeniSohbet && _karsiTaraf != null)
+          PopupMenuButton<String>(
+            onSelected: (secim) {
+              if (secim == 'engel') _engelDegistir();
+              if (secim == 'sessiz') _sessizDegistir();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'sessiz',
+                child: Row(
+                  children: [
+                    Icon(
+                      _sessiz
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_off_outlined,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(_sessiz ? 'Sesi ac' : 'Sessize al'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'engel',
+                child: Row(
+                  children: [
+                    Icon(
+                      _engellendi ? Icons.lock_open_outlined : Icons.block_outlined,
+                      size: 20,
+                      color: _engellendi ? null : AppColors.error,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(_engellendi ? 'Engeli kaldir' : 'Engelle'),
+                  ],
+                ),
+              ),
+            ],
           ),
       ],
       title: _karsiTarafYukleniyor
@@ -679,7 +883,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               ? 'yaziyor...'
                               : cevrimici
                                   ? 'cevrimici'
-                                  : 'son gorulme ${TarihFormat.sonGorulme(_karsiTaraf!.lastSeenAt)}',
+                                  : 'son gorulme ${TarihFormat.sonGorulme(sonGorulme)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: yaziyor || cevrimici

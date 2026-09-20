@@ -12,6 +12,20 @@ class MesajSayfasi {
   MesajSayfasi({required this.mesajlar, this.nextCursor, required this.hasMore});
 }
 
+// Sohbet basligi icin gereken bilgiler: karsi taraf ve onu engelleyip
+// engellemedigimiz. Engel durumu kullanici nesnesinin degil, iliskinin ozelligi.
+class SohbetDetay {
+  final UserModel kullanici;
+  final bool engellendi;
+  final bool sessiz;
+
+  SohbetDetay({
+    required this.kullanici,
+    required this.engellendi,
+    required this.sessiz,
+  });
+}
+
 class ChatRepository {
   final ApiClient _client;
 
@@ -183,14 +197,27 @@ class ChatRepository {
     );
   }
 
+  // Sessize alinan sohbette mesajlar gelmeye devam eder, sadece bildirim cikmaz
+  Future<void> sessizeAl(String conversationId, bool sessiz) async {
+    await _client.dio.patch(
+      '/conversations/$conversationId/mute',
+      data: {'muted': sessiz},
+    );
+  }
+
   Future<void> sohbetSil(String conversationId) async {
     await _client.dio.delete('/conversations/$conversationId');
   }
 
-    Future<UserModel> sohbetDetay(String conversationId) async {
+  Future<SohbetDetay> sohbetDetay(String conversationId) async {
     final yanit = await _client.dio.get('/conversations/$conversationId');
     final veri = yanit.data['data'];
-    return UserModel.fromJson(veri['user'] as Map<String, dynamic>);
+
+    return SohbetDetay(
+      kullanici: UserModel.fromJson(veri['user'] as Map<String, dynamic>),
+      engellendi: veri['isBlocked'] as bool? ?? false,
+      sessiz: veri['isMuted'] as bool? ?? false,
+    );
   }
 }
 

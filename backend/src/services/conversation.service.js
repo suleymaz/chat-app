@@ -67,14 +67,20 @@ export const listele = async (userId, { archived = false } = {}) => {
 
 // Sohbet detayi
 export const detay = async (userId, conversationId) => {
-  await erisimKontrol(conversationId, userId);
+  const katilim = await erisimKontrol(conversationId, userId);
 
   const sohbet = await conversationRepo.findById(conversationId);
   const karsiTaraf = sohbet.participants.find((k) => k.userId !== userId)?.user ?? null;
 
+  // Sadece "ben engelledim mi" bilgisi doner. Karsi tarafin beni engelleyip
+  // engellemedigi bilgisi verilmez, engellenen kisi bunu ogrenmemeli.
+  const engel = karsiTaraf ? await blockRepo.findByPair(userId, karsiTaraf.id) : null;
+
   return {
     id: sohbet.id,
     user: karsiTaraf,
+    isBlocked: engel !== null,
+    isMuted: katilim.isMuted,
     lastMessageAt: sohbet.lastMessageAt,
     createdAt: sohbet.createdAt,
   };
@@ -135,6 +141,11 @@ export const okunduIsaretle = async (userId, conversationId) => {
 export const arsivle = async (userId, conversationId, archived) => {
   await erisimKontrol(conversationId, userId);
   await conversationRepo.arsivle(conversationId, userId, archived);
+};
+
+export const sessizeAl = async (userId, conversationId, muted) => {
+  await erisimKontrol(conversationId, userId);
+  await conversationRepo.sessizeAl(conversationId, userId, muted);
 };
 
 export const sil = async (userId, conversationId) => {

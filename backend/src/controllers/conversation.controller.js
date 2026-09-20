@@ -28,6 +28,11 @@ export const arsivle = asyncHandler(async (req, res) => {
   noContent(res);
 });
 
+export const sessizeAl = asyncHandler(async (req, res) => {
+  await conversationService.sessizeAl(req.user.id, req.params.id, req.body.muted);
+  noContent(res);
+});
+
 export const sil = asyncHandler(async (req, res) => {
   await conversationService.sil(req.user.id, req.params.id);
   noContent(res);

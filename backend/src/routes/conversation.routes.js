@@ -11,6 +11,7 @@ import {
   mesajGonderSchema,
   mesajAraSchema,
   arsivSchema,
+  sessizSchema,
 } from "../validators/conversation.validator.js";
 
 const router = Router();
@@ -28,6 +29,7 @@ router.get("/:id", validate(conversationIdSchema), conversationController.detay)
 router.delete("/:id", validate(conversationIdSchema), conversationController.sil);
 router.post("/:id/read", validate(conversationIdSchema), conversationController.okunduIsaretle);
 router.patch("/:id/archive", validate(arsivSchema), conversationController.arsivle);
+router.patch("/:id/mute", validate(sessizSchema), conversationController.sessizeAl);
 
 // Sohbet icindeki mesajlar
 router.get("/:id/messages", validate(mesajListeSchema), messageController.listele);

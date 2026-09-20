@@ -98,7 +98,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             itemBuilder: (context, index) {
                 final sohbet = liste[index];
                 final cevrimiciHarita = ref.watch(cevrimiciProvider);
-                final cevrimici = cevrimiciHarita[sohbet.user.id] ?? sohbet.user.isOnline;
+                final cevrimici =
+                    cevrimiciHarita[sohbet.user.id]?.cevrimici ?? sohbet.user.isOnline;
 
                 return SohbetSatiri(
                   sohbet: sohbet.copyWith(

@@ -13,6 +13,19 @@ const bagliKullanicilar = new Map();
 // userId -> socket id listesi. Room yerine dogrudan socket'e yayin yapiyoruz
 const kullaniciSocketleri = new Map();
 
+// Dogrulanamayan token'in icindekileri imza kontrolu yapmadan okur.
+// Sadece loglama icin, guvenlik karari asla buna dayandirilmaz.
+const tokenKimligi = (token) => {
+  try {
+    const govde = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+    const gecenSaniye = Math.round(Date.now() / 1000 - govde.exp);
+
+    return { kullaniciId: govde.sub, sureDoldu: `${gecenSaniye} sn once` };
+  } catch {
+    return { kullaniciId: "cozulemedi" };
+  }
+};
+
 export const initSocket = (httpServer) => {
   if (io) {
     logger.warn("Socket.IO zaten baslatilmis, tekrar baslatilmiyor");
@@ -48,7 +61,12 @@ export const initSocket = (httpServer) => {
       socket.username = kullanici.username;
       next();
     } catch (error) {
-      logger.warn(`Socket auth basarisiz: ${error.message}`);
+      // Hangi kullanicinin ve ne kadar eski bir token'la geldigini bilmeden
+      // bu uyari tekrarlandiginda sebebi bulunamiyor, ayrinti da yaziliyor
+      logger.warn(`Socket auth basarisiz: ${error.message}`, {
+        ...tokenKimligi(socket.handshake.auth?.token),
+        adres: socket.handshake.address,
+      });
       next(new Error("Gecersiz token"));
     }
   });

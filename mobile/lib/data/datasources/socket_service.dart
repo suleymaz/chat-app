@@ -112,11 +112,13 @@ class SocketService {
         if (token == null) return;
       }
 
-      _socket?.dispose();
-      _socket = null;
+      _oncekiniKapat();
 
       // Polling uzerinden websocket'e yukseltme akisi sorun cikardigi icin
-      // dogrudan websocket kullaniyoruz
+      // dogrudan websocket kullaniyoruz.
+      // setForceNew: socket_io_client ayni adres icin Manager'i onbellege alip
+      // yeniden kullaniyor; o zaman ilk baglantidaki token'a takili kaliyor ve
+      // token yenilendikten sonra bile eski token'la el sikisiyor.
       _socket = io.io(
         AppConfig.socketUrl,
         io.OptionBuilder()
@@ -126,8 +128,12 @@ class SocketService {
             .enableReconnection()
             .setReconnectionAttempts(5)
             .setReconnectionDelay(2000)
+            .enableForceNew()
             .build(),
       );
+
+      // Yeniden baglanmalarda el sikismaya guncel token gitsin
+      _socket!.auth = {'token': token};
 
       _dinleyicileriKur();
       _socket!.connect();
@@ -279,26 +285,38 @@ class SocketService {
     _socket?.emit('typing:stop', {'conversationId': conversationId});
   }
 
-  // Cikis yapildiginda cagriliyor - yeniden baglanma denemeleri de durur
-  void kopar() {
+  /// Eski socket'i ve onu tasiyan Manager'i tamamen kapatir.
+  ///
+  /// Sadece dispose() yetmiyor: dispose yalnizca socket'i kapatiyor, Manager'in
+  /// kendi yeniden baglanma dongusu ayakta kaliyor. Ayakta kalan Manager ise
+  /// olusturuldugu andaki token ile el sikismaya devam ediyor; token yenilendigi
+  /// halde sunucuda "jwt expired" uyarilari birikiyordu. Once dinleyiciler
+  /// temizleniyor ki kapatma sirasinda onConnectError tetiklenip yeniden
+  /// baglanma zinciri baslatmasin.
+  void _oncekiniKapat() {
     final socket = _socket;
     _socket = null;
+
+    if (socket == null) return;
+
+    socket.clearListeners();
+    socket.io.close();
+    socket.dispose();
+  }
+
+  // Cikis yapildiginda cagriliyor - yeniden baglanma denemeleri de durur
+  void kopar() {
     _bagliMi = false;
     _yenilemeDenendi = false;
     _denemeSayisi = 0;
 
-    if (socket != null) {
-      socket.clearListeners();
-      socket.disconnect();
-      socket.dispose();
-    }
+    _oncekiniKapat();
 
     _baglantiDurumu.add(false);
   }
 
   void temizle() {
-    _socket?.dispose();
-    _socket = null;
     _bagliMi = false;
+    _oncekiniKapat();
   }
 }

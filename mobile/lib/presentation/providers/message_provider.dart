@@ -90,6 +90,48 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
     }
   }
 
+  /// Socket kopukken (uygulama arka plandayken) gelen mesajlar listeye
+  /// dusmuyor. Baglanti geri gelince ilk sayfa yeniden cekilip eksik mesajlar
+  /// basa ekleniyor, mevcut mesajlarin tik durumlari da guncelleniyor.
+  /// ilkYukleme'den farki: yuklenen eski sayfalar ve gonderilememis yerel
+  /// mesajlar listede kaliyor, ekran bos duruma dusmuyor.
+  Future<void> tazele() async {
+    if (_aktifSohbetId.isEmpty || state.yukleniyor) return;
+
+    try {
+      final sayfa = await _repo.mesajlariGetir(_aktifSohbetId);
+
+      final mevcutIdler = state.mesajlar.map((m) => m.id).toSet();
+      final eksikler = sayfa.mesajlar.where((m) => !mevcutIdler.contains(m.id));
+      final sunucudaki = {for (final m in sayfa.mesajlar) m.id: m};
+
+      final guncelListe = [
+        ...eksikler,
+        for (final m in state.mesajlar) _durumBirlestir(m, sunucudaki[m.id]),
+      ];
+
+      state = state.copyWith(
+        mesajlar: guncelListe,
+        // Liste bostu ise sayfalama bilgisi de bu yanittan geliyor
+        dahaVar: state.mesajlar.isEmpty ? sayfa.hasMore : state.dahaVar,
+        cursor: state.mesajlar.isEmpty ? sayfa.nextCursor : state.cursor,
+      );
+    } catch (_) {
+      // Tazeleme basarisizsa mevcut liste bozulmadan kalir
+    }
+  }
+
+  // Cevrimdisiyken kacirilan iletildi/okundu/silindi bilgilerini uygular
+  MessageModel _durumBirlestir(MessageModel yerel, MessageModel? sunucu) {
+    if (sunucu == null) return yerel;
+
+    return yerel.copyWith(
+      deliveredAt: sunucu.deliveredAt,
+      readAt: sunucu.readAt,
+      deletedAt: sunucu.deletedAt,
+    );
+  }
+
   // Yukari kaydirinca eski mesajlari getirir
   Future<void> eskileriYukle() async {
     if (!state.dahaVar || state.eskiYukleniyor || state.cursor == null) return;

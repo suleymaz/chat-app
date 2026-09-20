@@ -53,16 +53,34 @@ class YaziyorNotifier extends StateNotifier<Map<String, bool>> {
   }
 }
 
+// Bir kullanicinin anlik durumu. Cevrimdisi olurken sunucu son gorulme
+// zamanini da gonderiyor; ekranlar acildiktan sonra guncellenebilsin diye
+// bu deger de saklaniyor.
+class CevrimiciDurum {
+  final bool cevrimici;
+  final DateTime? lastSeenAt;
+
+  const CevrimiciDurum({required this.cevrimici, this.lastSeenAt});
+}
+
 // Kullanicilarin cevrimici durumu - socket'ten gelen guncellemeler burada tutulur
-final cevrimiciProvider = StateNotifierProvider<CevrimiciNotifier, Map<String, bool>>((ref) {
+final cevrimiciProvider =
+    StateNotifierProvider<CevrimiciNotifier, Map<String, CevrimiciDurum>>((ref) {
   return CevrimiciNotifier();
 });
 
-class CevrimiciNotifier extends StateNotifier<Map<String, bool>> {
+class CevrimiciNotifier extends StateNotifier<Map<String, CevrimiciDurum>> {
   CevrimiciNotifier() : super({});
 
-  void guncelle(String userId, bool cevrimici) {
-    state = {...state, userId: cevrimici};
+  void guncelle(String userId, bool cevrimici, {DateTime? lastSeenAt}) {
+    state = {
+      ...state,
+      userId: CevrimiciDurum(
+        cevrimici: cevrimici,
+        // Cevrimici olma olayinda son gorulme gelmiyor, bilineni koruyoruz
+        lastSeenAt: lastSeenAt ?? state[userId]?.lastSeenAt,
+      ),
+    };
   }
 }
 
@@ -141,7 +159,11 @@ class SocketKoordinator {
   // Cevrimici durumu cevrimiciProvider uzerinden okunuyor,
   // sohbet listesini tazelemeye gerek yok
   void _durumGeldi(DurumOlayi olay) {
-    _ref.read(cevrimiciProvider.notifier).guncelle(olay.userId, olay.cevrimici);
+    _ref.read(cevrimiciProvider.notifier).guncelle(
+          olay.userId,
+          olay.cevrimici,
+          lastSeenAt: olay.lastSeenAt,
+        );
   }
 
   void dur() {

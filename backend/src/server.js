@@ -12,8 +12,27 @@ const httpServer = http.createServer(app);
 initFirebase();
 initSocket(httpServer);
 
-const server = httpServer.listen(env.PORT, () => {
+// Sunucu cokup yeniden basladiginda bagli kullanicilarin disconnect olayi
+// hic islenmemis olur; isOnline true kalir ve herkes cevrimici gorunur.
+// Acilista bagli soket olmadigi icin tablo sifirlaniyor.
+const cevrimiciDurumSifirla = async () => {
+  try {
+    const sonuc = await prisma.user.updateMany({
+      where: { isOnline: true },
+      data: { isOnline: false },
+    });
+
+    if (sonuc.count > 0) {
+      logger.info(`${sonuc.count} kullanicinin cevrimici durumu sifirlandi`);
+    }
+  } catch (error) {
+    logger.error("Cevrimici durum sifirlanamadi", { message: error.message });
+  }
+};
+
+const server = httpServer.listen(env.PORT, async () => {
   logger.info(`Sunucu ${env.PORT} portunda calisiyor (${env.NODE_ENV})`);
+  await cevrimiciDurumSifirla();
 });
 
 // Suresi dolmus refresh token'lar hicbir zaman silinmiyordu, tablo surekli buyuyordu

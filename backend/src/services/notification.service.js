@@ -1,4 +1,4 @@
-import admin, { firebaseKullanilabilir } from "../config/firebase.js";
+import { firebaseKullanilabilir, mesajlasma } from "../config/firebase.js";
 import prisma from "../config/database.js";
 import logger from "../utils/logger.js";
 
@@ -64,7 +64,7 @@ export const mesajBildirimiGonder = async ({ alici, gonderen, mesaj, conversatio
   };
 
   try {
-    const sonuc = await admin.messaging().sendEachForMulticast(payload);
+    const sonuc = await mesajlasma().sendEachForMulticast(payload);
 
     // Gecersiz token'lari temizle
     const silinecekler = [];

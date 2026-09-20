@@ -1,4 +1,7 @@
-import admin from "firebase-admin";
+// firebase-admin 13'ten itibaren ESM tarafinda eski "admin.credential" /
+// "admin.messaging()" ad alani yok; modul bazli API kullaniliyor.
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import fs from "fs";
 import path from "path";
 import { env } from "./env.js";
@@ -26,9 +29,10 @@ export const initFirebase = () => {
   try {
     const serviceAccount = JSON.parse(fs.readFileSync(tamYol, "utf8"));
 
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    // Nodemon yeniden baslattiginda ayni uygulamayi ikinci kez kurmayalim
+    if (getApps().length === 0) {
+      initializeApp({ credential: cert(serviceAccount) });
+    }
 
     firebaseHazir = true;
     logger.info("Firebase baslatildi");
@@ -39,4 +43,5 @@ export const initFirebase = () => {
 
 export const firebaseKullanilabilir = () => firebaseHazir;
 
-export default admin;
+// Bildirim gonderiminde kullanilir - Firebase hazir degilse cagrilmamali
+export const mesajlasma = () => getMessaging();

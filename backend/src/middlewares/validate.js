@@ -13,7 +13,7 @@ export const validate = (schema) => (req, res, next) => {
       message: issue.message,
     }));
 
-    return next(ApiError.badRequest('Gonderilen veriler gecersiz', 'VALIDATION_ERROR', details));
+    return next(ApiError.badRequest('Gönderilen veriler geçersiz', 'VALIDATION_ERROR', details));
   }
 
   if (result.data.body) req.body = result.data.body;

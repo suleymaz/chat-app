@@ -55,13 +55,13 @@ class _EngellenenlerScreenState extends ConsumerState<EngellenenlerScreen> {
       setState(() => _kullanicilar.removeWhere((k) => k.id == kullanici.id));
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${kullanici.fullName} icin engel kaldirildi')),
+        SnackBar(content: Text('${kullanici.fullName} için engel kaldırıldı')),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Engel kaldirilamadi, baglantini kontrol et'),
+          content: Text('Engel kaldırılamadı, bağlantını kontrol et'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -73,7 +73,7 @@ class _EngellenenlerScreenState extends ConsumerState<EngellenenlerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Engellenen kullanicilar')),
+      appBar: AppBar(title: const Text('Engellenen kullanıcılar')),
       body: _govde(),
     );
   }
@@ -86,8 +86,8 @@ class _EngellenenlerScreenState extends ConsumerState<EngellenenlerScreen> {
     if (_hata) {
       return BosDurum(
         icon: Icons.cloud_off_outlined,
-        baslik: 'Liste yuklenemedi',
-        aciklama: 'Internet baglantini kontrol edip tekrar dene',
+        baslik: 'Liste yüklenemedi',
+        aciklama: 'İnternet bağlantını kontrol edip tekrar dene',
         aksiyon: FilledButton.icon(
           onPressed: _yukle,
           icon: const Icon(Icons.refresh, size: 18),
@@ -99,7 +99,7 @@ class _EngellenenlerScreenState extends ConsumerState<EngellenenlerScreen> {
     if (_kullanicilar.isEmpty) {
       return const BosDurum(
         icon: Icons.block_outlined,
-        baslik: 'Engellenen kullanici yok',
+        baslik: 'Engellenen kullanıcı yok',
         aciklama: 'Engellediklerin burada listelenir',
       );
     }
@@ -136,7 +136,7 @@ class _EngellenenlerScreenState extends ConsumerState<EngellenenlerScreen> {
                   )
                 : TextButton(
                     onPressed: () => _engelKaldir(kullanici),
-                    child: const Text('Engeli kaldir'),
+                    child: const Text('Engeli kaldır'),
                   ),
           );
         },

@@ -8,9 +8,9 @@ import '../../providers/auth_provider.dart';
 
 // Bildirim onizleme secenekleri - sunucudaki enum ile birebir ayni
 const _onizlemeSecenekleri = {
-  'NAME_AND_MESSAGE': ('Ad ve mesaj', 'Bildirimde gonderen ve mesaj icerigi gorunur'),
-  'NAME_ONLY': ('Sadece ad', 'Yalnizca gonderenin adi gorunur'),
-  'NONE': ('Gizle', 'Bildirimde hicbir detay gorunmez'),
+  'NAME_AND_MESSAGE': ('Ad ve mesaj', 'Bildirimde gönderen ve mesaj içeriği görünür'),
+  'NAME_ONLY': ('Sadece ad', 'Yalnızca gönderenin adı görünür'),
+  'NONE': ('Gizle', 'Bildirimde hiçbir detay görünmez'),
 };
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -36,7 +36,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ayar kaydedilemedi, baglantini kontrol et'),
+          content: Text('Ayar kaydedilemedi, bağlantını kontrol et'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -49,8 +49,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final onay = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cikis yapilsin mi?'),
-        content: const Text('Tekrar mesajlasmak icin yeniden giris yapman gerekecek.'),
+        title: const Text('Çıkış yapılsın mı?'),
+        content: const Text('Tekrar mesajlaşmak için yeniden giriş yapman gerekecek.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -58,7 +58,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cikis yap', style: TextStyle(color: AppColors.error)),
+            child: const Text('Çıkış yap', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -86,7 +86,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ? null
                 : (deger) => _ayarGuncelle({'notificationsEnabled': deger}),
             title: const Text('Bildirimlere izin ver'),
-            subtitle: const Text('Yeni mesaj geldiginde bildirim gonderilir'),
+            subtitle: const Text('Yeni mesaj geldiğinde bildirim gönderilir'),
             activeThumbColor: AppColors.primary,
           ),
           const Divider(height: 1),
@@ -119,7 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _baslik('Gizlilik'),
           ListTile(
             leading: const Icon(Icons.block_outlined, color: AppColors.textSecondary),
-            title: const Text('Engellenen kullanicilar'),
+            title: const Text('Engellenen kullanıcılar'),
             trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
             onTap: () => context.push(Rotalar.blocked),
           ),
@@ -133,7 +133,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.logout, color: AppColors.error),
-            title: const Text('Cikis yap', style: TextStyle(color: AppColors.error)),
+            title: const Text('Çıkış yap', style: TextStyle(color: AppColors.error)),
             onTap: _cikisOnayi,
           ),
           const SizedBox(height: 24),

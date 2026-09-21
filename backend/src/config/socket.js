@@ -54,7 +54,7 @@ export const initSocket = (httpServer) => {
       const kullanici = await userRepo.findById(payload.sub);
 
       if (!kullanici) {
-        return next(new Error("Kullanici bulunamadi"));
+        return next(new Error("Kullanıcı bulunamadı"));
       }
 
       socket.userId = kullanici.id;
@@ -67,7 +67,7 @@ export const initSocket = (httpServer) => {
         ...tokenKimligi(socket.handshake.auth?.token),
         adres: socket.handshake.address,
       });
-      next(new Error("Gecersiz token"));
+      next(new Error("Geçersiz oturum bilgisi"));
     }
   });
 

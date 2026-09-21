@@ -20,7 +20,7 @@ const erisimKontrol = async (conversationId, userId) => {
   const katilim = await conversationRepo.katilimBul(conversationId, userId);
 
   if (!katilim) {
-    throw ApiError.notFound("Sohbet bulunamadi", "CONVERSATION_NOT_FOUND");
+    throw ApiError.notFound("Sohbet bulunamadı", "CONVERSATION_NOT_FOUND");
   }
 
   return katilim;
@@ -89,19 +89,19 @@ export const detay = async (userId, conversationId) => {
 // Bir kullaniciyla olan sohbeti bulur, yoksa null doner
 export const kullaniciylaSohbet = async (userId, digerUserId) => {
   if (userId === digerUserId) {
-    throw ApiError.badRequest("Kendinizle sohbet baslatamazsiniz", "SELF_CONVERSATION");
+    throw ApiError.badRequest("Kendinizle sohbet başlatamazsınız", "SELF_CONVERSATION");
   }
 
   const hedef = await userRepo.findById(digerUserId);
 
   if (!hedef) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const engelli = await blockRepo.engelVarMi(userId, digerUserId);
 
   if (engelli) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const sohbet = await conversationRepo.ikiliSohbetBul(userId, digerUserId);

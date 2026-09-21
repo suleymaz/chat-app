@@ -19,7 +19,7 @@ export const girisKontrol = asyncHandler(async (req, res, next) => {
   const token = tokenAyikla(req);
 
   if (!token) {
-    throw ApiError.unauthorized("Giris yapmaniz gerekiyor", "NO_TOKEN");
+    throw ApiError.unauthorized("Giriş yapmanız gerekiyor", "NO_TOKEN");
   }
 
   let payload;
@@ -27,15 +27,15 @@ export const girisKontrol = asyncHandler(async (req, res, next) => {
     payload = verifyAccessToken(token);
   } catch (error) {
     if (error.name === "TokenExpiredError") {
-      throw ApiError.unauthorized("Oturum suresi doldu", "TOKEN_EXPIRED");
+      throw ApiError.unauthorized("Oturum süresi doldu", "TOKEN_EXPIRED");
     }
-    throw ApiError.unauthorized("Gecersiz token", "INVALID_TOKEN");
+    throw ApiError.unauthorized("Geçersiz oturum bilgisi", "INVALID_TOKEN");
   }
 
   const kullanici = await userRepo.findById(payload.sub);
 
   if (!kullanici) {
-    throw ApiError.unauthorized("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.unauthorized("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   req.user = kullanici;

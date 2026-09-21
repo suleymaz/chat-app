@@ -55,7 +55,7 @@ const storage = (altKlasor) =>
 
 const gorselFiltre = (req, file, cb) => {
   if (!GORSEL_TIPLERI.includes(file.mimetype)) {
-    return cb(ApiError.badRequest("Sadece JPEG, PNG, WEBP ve GIF yuklenebilir", "INVALID_FILE_TYPE"));
+    return cb(ApiError.badRequest("Sadece JPEG, PNG, WEBP ve GIF yüklenebilir", "INVALID_FILE_TYPE"));
   }
   cb(null, true);
 };
@@ -64,7 +64,7 @@ const dosyaFiltre = (req, file, cb) => {
   const izinli = [...GORSEL_TIPLERI, ...DOSYA_TIPLERI];
 
   if (!izinli.includes(file.mimetype)) {
-    return cb(ApiError.badRequest("Bu dosya turu desteklenmiyor", "INVALID_FILE_TYPE"));
+    return cb(ApiError.badRequest("Bu dosya türü desteklenmiyor", "INVALID_FILE_TYPE"));
   }
   cb(null, true);
 };
@@ -107,13 +107,13 @@ export const uploadHandler = (uploader) => (req, res, next) => {
         const mb = Math.round((uploader.limitBayt ?? env.MAX_FILE_SIZE) / 1024 / 1024);
         return next(ApiError.badRequest(`Dosya boyutu en fazla ${mb} MB olabilir`, "FILE_TOO_LARGE"));
       }
-      return next(ApiError.badRequest("Dosya yuklenemedi", "UPLOAD_ERROR"));
+      return next(ApiError.badRequest("Dosya yüklenemedi", "UPLOAD_ERROR"));
     }
 
     if (err) return next(err);
 
     if (!req.file) {
-      return next(ApiError.badRequest("Dosya gonderilmedi", "NO_FILE"));
+      return next(ApiError.badRequest("Dosya gönderilmedi", "NO_FILE"));
     }
 
     next();

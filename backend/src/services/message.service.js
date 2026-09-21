@@ -56,7 +56,7 @@ export const gonder = async (gonderen, conversationId, { content }) => {
   const karsiTaraf = sohbet.participants.find((k) => k.userId !== userId);
 
   if (!karsiTaraf) {
-    throw ApiError.badRequest("Sohbette karsi taraf bulunamadi", "NO_RECIPIENT");
+    throw ApiError.badRequest("Sohbette karşı taraf bulunamadı", "NO_RECIPIENT");
   }
 
   const engelli = await blockRepo.engelVarMi(userId, karsiTaraf.userId);
@@ -78,13 +78,13 @@ export const yeniSohbetBaslat = async (gonderen, { userId: aliciId, content }) =
   const userId = gonderen.id;
 
   if (userId === aliciId) {
-    throw ApiError.badRequest("Kendinize mesaj gonderemezsiniz", "SELF_MESSAGE");
+    throw ApiError.badRequest("Kendinize mesaj gönderemezsiniz", "SELF_MESSAGE");
   }
 
   const alici = await userRepo.findById(aliciId);
 
   if (!alici) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const engelli = await blockRepo.engelVarMi(userId, aliciId);
@@ -126,11 +126,11 @@ export const sil = async (userId, messageId) => {
   const mesaj = await messageRepo.findByIdRaw(messageId);
 
   if (!mesaj || mesaj.deletedAt) {
-    throw ApiError.notFound("Mesaj bulunamadi", "MESSAGE_NOT_FOUND");
+    throw ApiError.notFound("Mesaj bulunamadı", "MESSAGE_NOT_FOUND");
   }
 
   if (mesaj.senderId !== userId) {
-    throw ApiError.forbidden("Sadece kendi mesajlarinizi silebilirsiniz", "NOT_MESSAGE_OWNER");
+    throw ApiError.forbidden("Sadece kendi mesajlarınızı silebilirsiniz", "NOT_MESSAGE_OWNER");
   }
 
   await erisimKontrol(mesaj.conversationId, userId);
@@ -214,10 +214,27 @@ async function mesajIletimi(mesaj, aliciId, gonderen, conversationId) {
   });
 }
 
+// Yuklenmis dosya varken calisan kontroller icin: kontrol hata verirse
+// diskteki dosyayi silip hatayi yeniden firlatir.
+const ekliKontrol = async (kontrol, altKlasor, dosya) => {
+  try {
+    return await kontrol();
+  } catch (hata) {
+    await fileService.dosyaSil(fileService.urlUret(altKlasor, dosya.filename));
+    throw hata;
+  }
+};
+
 export const gorselGonder = async (gonderen, conversationId, { content, dosya }) => {
   await ekIcerikKontrol(content, "messages", dosya);
 
-  const { karsiTarafId, engelli } = await ekOncesiKontrol(gonderen.id, conversationId);
+  // Sohbet erisimi bu noktada dogrulaniyor ama dosya coktan diske yazilmis
+  // oluyor. Hata firlarsa dosya oksuz kalmasin diye temizliyoruz.
+  const { karsiTarafId, engelli } = await ekliKontrol(
+    () => ekOncesiKontrol(gonderen.id, conversationId),
+    "messages",
+    dosya
+  );
 
   if (engelli) {
     await fileService.dosyaSil(fileService.urlUret("messages", dosya.filename));
@@ -242,7 +259,11 @@ export const gorselGonder = async (gonderen, conversationId, { content, dosya })
 export const dosyaGonder = async (gonderen, conversationId, { content, dosya }) => {
   await ekIcerikKontrol(content, "files", dosya);
 
-  const { karsiTarafId, engelli } = await ekOncesiKontrol(gonderen.id, conversationId);
+  const { karsiTarafId, engelli } = await ekliKontrol(
+    () => ekOncesiKontrol(gonderen.id, conversationId),
+    "files",
+    dosya
+  );
 
   if (engelli) {
     await fileService.dosyaSil(fileService.urlUret("files", dosya.filename));
@@ -286,7 +307,7 @@ async function ekAliciKontrol(aliciId, altKlasor, dosya) {
 
   await fileService.dosyaSil(fileService.urlUret(altKlasor, dosya.filename));
 
-  throw ApiError.badRequest("Gecersiz kullanici id", "VALIDATION_ERROR");
+  throw ApiError.badRequest("Geçersiz kullanıcı kimliği", "VALIDATION_ERROR");
 }
 
 // Ilk mesaj gorsel veya dosya oldugunda sohbeti ekle birlikte olusturur.
@@ -301,14 +322,14 @@ async function yeniSohbetEkGonder(gonderen, { aliciId, content, dosya, tip, altK
 
   if (userId === aliciId) {
     await ekiSil();
-    throw ApiError.badRequest("Kendinize mesaj gonderemezsiniz", "SELF_MESSAGE");
+    throw ApiError.badRequest("Kendinize mesaj gönderemezsiniz", "SELF_MESSAGE");
   }
 
   const alici = await userRepo.findById(aliciId);
 
   if (!alici) {
     await ekiSil();
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const engelli = await blockRepo.engelVarMi(userId, aliciId);
@@ -398,7 +419,7 @@ async function ekOncesiKontrol(userId, conversationId) {
   const karsiTaraf = sohbet.participants.find((k) => k.userId !== userId);
 
   if (!karsiTaraf) {
-    throw ApiError.badRequest("Sohbette karsi taraf bulunamadi", "NO_RECIPIENT");
+    throw ApiError.badRequest("Sohbette karşı taraf bulunamadı", "NO_RECIPIENT");
   }
 
   const engelli = await blockRepo.engelVarMi(userId, karsiTaraf.userId);

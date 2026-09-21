@@ -26,6 +26,12 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        // Varsayilan ipucu rengi girilen metne cok yakin, alan doluymus gibi
+        // gorunuyordu. Solgunlastirip yazilan metinden ayirdik.
+        hintStyle: TextStyle(
+          color: AppColors.textTertiary.withValues(alpha: 0.6),
+          fontWeight: FontWeight.w400,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.border),

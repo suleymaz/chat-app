@@ -76,7 +76,7 @@ class ApiClient {
         DioException(
           requestOptions: err.requestOptions,
           error: ApiException(
-            message: 'Sunucuya ulasilamiyor, baglantinizi kontrol edin',
+            message: 'Sunucuya ulaşılamıyor, bağlantınızı kontrol edin',
             code: 'TIMEOUT',
           ),
         ),
@@ -89,7 +89,7 @@ class ApiClient {
         DioException(
           requestOptions: err.requestOptions,
           error: ApiException(
-            message: 'Internet baglantisi yok',
+            message: 'İnternet bağlantısı yok',
             code: 'NETWORK_ERROR',
           ),
         ),
@@ -108,7 +108,7 @@ class ApiClient {
         response: err.response,
         error: err.response != null
             ? _hataCevir(err.response!)
-            : ApiException(message: 'Beklenmeyen bir hata olustu', code: 'UNKNOWN'),
+            : ApiException(message: 'Beklenmeyen bir hata oluştu', code: 'UNKNOWN'),
       ),
     );
   }
@@ -191,7 +191,7 @@ class ApiClient {
       handler.reject(
         DioException(
           requestOptions: options,
-          error: ApiException(message: 'Istek tekrarlanamadi', code: 'RETRY_FAILED'),
+          error: ApiException(message: 'İstek tekrarlanamadı', code: 'RETRY_FAILED'),
         ),
       );
     }
@@ -206,7 +206,7 @@ class ApiClient {
         DioException(
           requestOptions: bekleyen.options,
           error: ApiException(
-            message: 'Oturumunuz sonlandi, tekrar giris yapin',
+            message: 'Oturumunuz sonlandı, tekrar giriş yapın',
             code: 'SESSION_EXPIRED',
             statusCode: 401,
           ),
@@ -221,7 +221,7 @@ class ApiClient {
       DioException(
         requestOptions: err.requestOptions,
         error: ApiException(
-          message: 'Oturumunuz sonlandi, tekrar giris yapin',
+          message: 'Oturumunuz sonlandı, tekrar giriş yapın',
           code: 'SESSION_EXPIRED',
           statusCode: 401,
         ),
@@ -247,7 +247,7 @@ class ApiClient {
       }
 
       return ApiException(
-        message: hata['message'] as String? ?? 'Bir hata olustu',
+        message: hata['message'] as String? ?? 'Bir hata oluştu',
         code: hata['code'] as String? ?? 'ERROR',
         statusCode: response.statusCode,
         alanHatalari: alanlar,
@@ -255,7 +255,7 @@ class ApiClient {
     }
 
     return ApiException(
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       code: 'UNKNOWN',
       statusCode: response.statusCode,
     );

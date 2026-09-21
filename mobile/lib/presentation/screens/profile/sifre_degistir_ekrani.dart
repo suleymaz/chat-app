@@ -57,12 +57,12 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
       final hata = e.error;
       if (!mounted) return;
       setState(() {
-        _genelHata = hata is ApiException ? hata.message : 'Sifre degistirilemedi';
+        _genelHata = hata is ApiException ? hata.message : 'Şifre değiştirilemedi';
         _alanHatalari = hata is ApiException ? hata.alanHatalari : null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _genelHata = 'Beklenmeyen bir hata olustu');
+      setState(() => _genelHata = 'Beklenmeyen bir hata oluştu');
     } finally {
       if (mounted) setState(() => _kaydediliyor = false);
     }
@@ -73,10 +73,10 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Sifren degistirildi'),
+        title: const Text('Şifren değiştirildi'),
         content: const Text(
-          'Guvenlik icin tum cihazlardaki oturumlar sonlandirildi. '
-          'Yeni sifrenle tekrar giris yapman gerekiyor.',
+          'Güvenlik için tüm cihazlardaki oturumlar sonlandırıldı. '
+          'Yeni şifrenle tekrar giriş yapman gerekiyor.',
         ),
         actions: [
           TextButton(
@@ -94,7 +94,7 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sifre degistir')),
+      appBar: AppBar(title: const Text('Şifre değiştir')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Center(
@@ -112,13 +112,13 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
 
                   AppTextField(
                     controller: _mevcutController,
-                    label: 'Mevcut sifre',
+                    label: 'Mevcut şifre',
                     icon: Icons.lock_outline,
                     sifreMi: true,
                     aktif: !_kaydediliyor,
                     hataMetni: _alanHatalari?['currentPassword'],
                     dogrula: (deger) {
-                      if (deger == null || deger.isEmpty) return 'Mevcut sifre gerekli';
+                      if (deger == null || deger.isEmpty) return 'Mevcut şifre gerekli';
                       return null;
                     },
                   ),
@@ -126,7 +126,7 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
 
                   AppTextField(
                     controller: _yeniController,
-                    label: 'Yeni sifre',
+                    label: 'Yeni şifre',
                     icon: Icons.lock_reset_outlined,
                     sifreMi: true,
                     aktif: !_kaydediliyor,
@@ -137,26 +137,26 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
 
                   AppTextField(
                     controller: _tekrarController,
-                    label: 'Yeni sifre (tekrar)',
+                    label: 'Yeni şifre (tekrar)',
                     icon: Icons.lock_reset_outlined,
                     sifreMi: true,
                     aktif: !_kaydediliyor,
                     dogrula: (deger) {
-                      if (deger != _yeniController.text) return 'Sifreler eslesmiyor';
+                      if (deger != _yeniController.text) return 'Şifreler eşleşmiyor';
                       return null;
                     },
                   ),
                   const SizedBox(height: 12),
 
                   const Text(
-                    'Sifre en az 8 karakter olmali; bir buyuk harf, bir kucuk harf '
+                    'Şifre en az 8 karakter olmalı; bir büyük harf, bir küçük harf '
                     've bir rakam icermeli.',
                     style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
                   ),
                   const SizedBox(height: 24),
 
                   AppButton(
-                    metin: 'Sifreyi degistir',
+                    metin: 'Şifreyi değiştir',
                     yukleniyor: _kaydediliyor,
                     onPressed: _degistir,
                   ),
@@ -173,11 +173,11 @@ class _SifreDegistirEkraniState extends ConsumerState<SifreDegistirEkrani> {
   String? _yeniSifreDogrula(String? deger) {
     final sifre = deger ?? '';
 
-    if (sifre.length < 8) return 'Sifre en az 8 karakter olmali';
-    if (!RegExp(r'[a-z]').hasMatch(sifre)) return 'En az bir kucuk harf icermeli';
-    if (!RegExp(r'[A-Z]').hasMatch(sifre)) return 'En az bir buyuk harf icermeli';
+    if (sifre.length < 8) return 'Şifre en az 8 karakter olmalı';
+    if (!RegExp(r'[a-z]').hasMatch(sifre)) return 'En az bir küçük harf içermeli';
+    if (!RegExp(r'[A-Z]').hasMatch(sifre)) return 'En az bir büyük harf içermeli';
     if (!RegExp(r'[0-9]').hasMatch(sifre)) return 'En az bir rakam icermeli';
-    if (sifre == _mevcutController.text) return 'Yeni sifre eskisiyle ayni olamaz';
+    if (sifre == _mevcutController.text) return 'Yeni şifre eskisiyle aynı olamaz';
 
     return null;
   }

@@ -49,10 +49,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         } on DioException catch (e) {
       final hata = e.error;
       setState(() {
-        _genelHata = hata is ApiException ? hata.message : 'Baglanti hatasi';
+        _genelHata = hata is ApiException ? hata.message : 'Bağlantı hatası';
       });
     } catch (_) {
-      setState(() => _genelHata = 'Beklenmeyen bir hata olustu');
+      setState(() => _genelHata = 'Beklenmeyen bir hata oluştu');
     } finally {
       if (mounted) setState(() => _yukleniyor = false);
     }
@@ -75,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _logo(),
                     const SizedBox(height: 40),
                     const Text(
-                      'Tekrar hos geldin',
+                      'Hoş geldiniz',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
@@ -84,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Devam etmek icin giris yap',
+                      'Devam etmek için giriş yap',
                       style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 28),
@@ -96,14 +96,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     AppTextField(
                       controller: _identifierController,
-                      label: 'Kullanici adi, e-posta veya telefon',
-                      hint: 'ornek: ahmet',
+                      label: 'Kullanıcı adı, e-posta veya telefon',
+                      hint: 'örnek: ahmet',
                       icon: Icons.person_outline,
                       aktif: !_yukleniyor,
                       klavyeAksiyonu: TextInputAction.next,
                       dogrula: (deger) {
                         if (deger == null || deger.trim().isEmpty) {
-                          return 'Bu alan bos birakilamaz';
+                          return 'Bu alan boş bırakılamaz';
                         }
                         return null;
                       },
@@ -112,8 +112,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     AppTextField(
                       controller: _sifreController,
-                      label: 'Sifre',
-                      hint: 'Sifreni gir',
+                      label: 'Şifre',
+                      hint: 'Şifreni gir',
                       icon: Icons.lock_outline,
                       sifreMi: true,
                       aktif: !_yukleniyor,
@@ -121,7 +121,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       gonderildiginde: (_) => _girisYap(),
                       dogrula: (deger) {
                         if (deger == null || deger.isEmpty) {
-                          return 'Sifre gerekli';
+                          return 'Şifre gerekli';
                         }
                         return null;
                       },
@@ -129,7 +129,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 24),
 
                     AppButton(
-                      metin: 'Giris yap',
+                      metin: 'Giriş yap',
                       yukleniyor: _yukleniyor,
                       onPressed: _girisYap,
                     ),
@@ -139,7 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          'Hesabin yok mu?',
+                          'Hesabın yok mu?',
                           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                         ),
                         TextButton(
@@ -147,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ? null
                               : () => context.push(Rotalar.register),
                           child: const Text(
-                            'Kayit ol',
+                            'Kayıt ol',
                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                         ),

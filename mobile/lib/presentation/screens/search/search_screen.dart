@@ -69,13 +69,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (!mounted) return;
       final hata = e.error;
       setState(() {
-        _hata = hata is ApiException ? hata.message : 'Arama yapilamadi';
+        _hata = hata is ApiException ? hata.message : 'Arama yapılamadı';
         _aramaYapildi = true;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _hata = 'Arama yapilamadi';
+        _hata = 'Arama yapılamadı';
         _aramaYapildi = true;
       });
     } finally {
@@ -100,7 +100,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sohbet acilamadi')),
+        const SnackBar(content: Text('Sohbet açılamadı')),
       );
     }
   }
@@ -114,7 +114,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           autofocus: true,
           onChanged: _terimDegisti,
           decoration: const InputDecoration(
-            hintText: 'Kullanici adi, e-posta veya telefon',
+            hintText: 'Kullanıcı adı, e-posta veya telefon',
             border: InputBorder.none,
             filled: false,
             contentPadding: EdgeInsets.zero,
@@ -144,7 +144,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (_hata != null) {
       return BosDurum(
         icon: Icons.error_outline,
-        baslik: 'Arama yapilamadi',
+        baslik: 'Arama yapılamadı',
         aciklama: _hata,
       );
     }
@@ -152,7 +152,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (!_aramaYapildi) {
       return const BosDurum(
         icon: Icons.person_search_outlined,
-        baslik: 'Kullanici ara',
+        baslik: 'Kullanıcı ara',
         aciklama: 'En az 2 karakter yazarak aramaya baslayabilirsin',
       );
     }
@@ -160,7 +160,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (_sonuclar.isEmpty) {
       return const BosDurum(
         icon: Icons.search_off,
-        baslik: 'Sonuc bulunamadi',
+        baslik: 'Sonuç bulunamadı',
         aciklama: 'Farkli bir arama terimi deneyebilirsin',
       );
     }

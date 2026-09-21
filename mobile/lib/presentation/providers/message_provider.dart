@@ -86,7 +86,7 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
         cursor: sayfa.nextCursor,
       );
     } catch (e) {
-      state = state.copyWith(yukleniyor: false, hata: 'Mesajlar yuklenemedi');
+      state = state.copyWith(yukleniyor: false, hata: 'Mesajlar yüklenemedi');
     }
   }
 

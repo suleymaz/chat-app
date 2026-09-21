@@ -20,7 +20,7 @@ export class ApiError extends Error {
     return new ApiError(403, message, code);
   }
 
-  static notFound(message = 'Kayit bulunamadi', code = 'NOT_FOUND') {
+  static notFound(message = 'Kayıt bulunamadı', code = 'NOT_FOUND') {
     return new ApiError(404, message, code);
   }
 
@@ -28,7 +28,7 @@ export class ApiError extends Error {
     return new ApiError(409, message, code);
   }
 
-  static tooManyRequests(message = 'Cok fazla istek gonderildi', code = 'TOO_MANY_REQUESTS') {
+  static tooManyRequests(message = 'Çok fazla istek gönderildi', code = 'TOO_MANY_REQUESTS') {
     return new ApiError(429, message, code);
   }
 

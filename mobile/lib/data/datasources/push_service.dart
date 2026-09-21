@@ -54,7 +54,7 @@ class PushService {
     try {
       await Firebase.initializeApp();
     } catch (hata) {
-      debugPrint('Firebase baslatilamadi, bildirimler devre disi: $hata');
+      debugPrint('Firebase başlatılamadı, bildirimler devre dışı: $hata');
       return;
     }
 
@@ -73,7 +73,7 @@ class PushService {
 
       _hazir = true;
     } catch (hata) {
-      debugPrint('Bildirim kurulumu basarisiz: $hata');
+      debugPrint('Bildirim kurulumu başarısız: $hata');
     }
   }
 

@@ -14,6 +14,14 @@ export const errorHandler = (err, req, res, next) => {
     error = mapPrismaError(error);
   }
 
+  // body-parser bozuk veya cok buyuk govdede hata firlatiyor. Bunlar istemci
+  // hatasi; yakalanmazsa 500 donup gelistirme kipinde yigin izi de sizdiriyordu.
+  if (error?.type === 'entity.parse.failed') {
+    error = ApiError.badRequest('Gonderilen JSON okunamadi', 'INVALID_JSON');
+  } else if (error?.type === 'entity.too.large') {
+    error = ApiError.badRequest('Gonderilen veri cok buyuk', 'PAYLOAD_TOO_LARGE');
+  }
+
   if (!(error instanceof ApiError)) {
     logger.error('Beklenmeyen hata', { message: err.message, stack: err.stack });
     error = ApiError.internal();
@@ -49,9 +57,9 @@ function mapPrismaError(err) {
       return ApiError.conflict(`Bu ${field} zaten kullaniliyor`, 'DUPLICATE_FIELD');
     }
     case 'P2025':
-      return ApiError.notFound('Kayit bulunamadi', 'NOT_FOUND');
+      return ApiError.notFound('Kayıt bulunamadı', 'NOT_FOUND');
     case 'P2003':
-      return ApiError.badRequest('Iliskili kayit bulunamadi', 'FOREIGN_KEY_ERROR');
+      return ApiError.badRequest('İlişkili kayıt bulunamadı', 'FOREIGN_KEY_ERROR');
     default:
       return ApiError.internal();
   }

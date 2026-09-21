@@ -87,10 +87,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           }
         });
       } else {
-        setState(() => _genelHata = 'Baglanti hatasi');
+        setState(() => _genelHata = 'Bağlantı hatası');
       }
     } catch (e) {
-      setState(() => _genelHata = 'Beklenmeyen bir hata olustu');
+      setState(() => _genelHata = 'Beklenmeyen bir hata oluştu');
     } finally {
       if (mounted) setState(() => _yukleniyor = false);
     }
@@ -104,7 +104,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: _yukleniyor ? null : () => context.pop(),
         ),
-        title: const Text('Hesap olustur'),
+        title: const Text('Hesap oluştur'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -118,7 +118,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Birkac bilgiyle baslayalim',
+                      'Birkaç bilgiyle başlayalım',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -135,14 +135,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     AppTextField(
                       controller: _adSoyadController,
                       label: 'Ad soyad',
-                      hint: 'Ahmet Yilmaz',
+                      hint: 'Ahmet Yılmaz',
                       icon: Icons.badge_outlined,
                       aktif: !_yukleniyor,
                       klavyeAksiyonu: TextInputAction.next,
                       hataMetni: _alanHatalari['fullName'],
                       dogrula: (deger) {
                         if (deger == null || deger.trim().length < 2) {
-                          return 'Ad soyad en az 2 karakter olmali';
+                          return 'Ad soyad en az 2 karakter olmalı';
                         }
                         return null;
                       },
@@ -151,7 +151,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                     AppTextField(
                       controller: _kullaniciAdiController,
-                      label: 'Kullanici adi',
+                      label: 'Kullanıcı adı',
                       hint: 'ahmet',
                       icon: Icons.alternate_email,
                       aktif: !_yukleniyor,
@@ -160,9 +160,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       maksUzunluk: 30,
                       dogrula: (deger) {
                         final d = deger?.trim().toLowerCase() ?? '';
-                        if (d.length < 3) return 'En az 3 karakter olmali';
+                        if (d.length < 3) return 'En az 3 karakter olmalı';
                         if (!RegExp(r'^[a-z0-9_]+$').hasMatch(d)) {
-                          return 'Sadece kucuk harf, rakam ve alt cizgi';
+                          return 'Sadece küçük harf, rakam ve alt çizgi';
                         }
                         return null;
                       },
@@ -182,7 +182,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         final d = deger?.trim() ?? '';
                         if (d.isEmpty) return 'E-posta gerekli';
                         if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(d)) {
-                          return 'Gecerli bir e-posta girin';
+                          return 'Geçerli bir e-posta girin';
                         }
                         return null;
                       },
@@ -192,16 +192,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     AppTextField(
                       controller: _telefonController,
                       label: 'Telefon',
-                      hint: '+905551234567',
+                      hint: '05551234567',
                       icon: Icons.phone_outlined,
                       klavyeTipi: TextInputType.phone,
+                      maksUzunluk: 11,
                       aktif: !_yukleniyor,
                       klavyeAksiyonu: TextInputAction.next,
                       hataMetni: _alanHatalari['phone'],
                       dogrula: (deger) {
                         final d = deger?.trim() ?? '';
-                        if (!RegExp(r'^\+90[0-9]{10}$').hasMatch(d)) {
-                          return '+905XXXXXXXXX formatinda olmali';
+                        if (!RegExp(r'^0[0-9]{10}$').hasMatch(d)) {
+                          return '05XXXXXXXXX biçiminde olmalı';
                         }
                         return null;
                       },
@@ -220,9 +221,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       hataMetni: _alanHatalari['password'],
                       dogrula: (deger) {
                         final d = deger ?? '';
-                        if (d.length < 8) return 'En az 8 karakter olmali';
-                        if (!RegExp(r'[a-z]').hasMatch(d)) return 'En az bir kucuk harf gerekli';
-                        if (!RegExp(r'[A-Z]').hasMatch(d)) return 'En az bir buyuk harf gerekli';
+                        if (d.length < 8) return 'En az 8 karakter olmalı';
+                        if (!RegExp(r'[a-z]').hasMatch(d)) return 'En az bir küçük harf gerekli';
+                        if (!RegExp(r'[A-Z]').hasMatch(d)) return 'En az bir büyük harf gerekli';
                         if (!RegExp(r'[0-9]').hasMatch(d)) return 'En az bir rakam gerekli';
                         return null;
                       },
@@ -230,7 +231,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 8),
 
                     const Text(
-                      'Sifre en az 8 karakter olmali, buyuk harf, kucuk harf ve rakam icermeli.',
+                      'Şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli.',
                       style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
                     ),
                     const SizedBox(height: 24),
@@ -246,13 +247,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          'Zaten hesabin var mi?',
+                          'Zaten hesabın var mı?',
                           style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                         ),
                         TextButton(
                           onPressed: _yukleniyor ? null : () => context.pop(),
                           child: const Text(
-                            'Giris yap',
+                            'Giriş yap',
                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                         ),

@@ -6,11 +6,11 @@ const prisma = new PrismaClient();
 const SEED_PASSWORD = 'Test1234!';
 
 const USERS = [
-  { username: 'ahmet',  email: 'ahmet@example.com',  phone: '+905551110001', fullName: 'Ahmet Yilmaz',   bio: 'Yazilim gelistirici' },
-  { username: 'ayse',   email: 'ayse@example.com',   phone: '+905551110002', fullName: 'Ayse Demir',     bio: 'Merhaba!' },
-  { username: 'mehmet', email: 'mehmet@example.com', phone: '+905551110003', fullName: 'Mehmet Kaya',    bio: null },
-  { username: 'zeynep', email: 'zeynep@example.com', phone: '+905551110004', fullName: 'Zeynep Sahin',   bio: 'Musait degilim' },
-  { username: 'can',    email: 'can@example.com',    phone: '+905551110005', fullName: 'Can Ozturk',     bio: null },
+  { username: 'ahmet',  email: 'ahmet@example.com',  phone: '05551110001', fullName: 'Ahmet Yilmaz',   bio: 'Yazilim gelistirici' },
+  { username: 'ayse',   email: 'ayse@example.com',   phone: '05551110002', fullName: 'Ayse Demir',     bio: 'Merhaba!' },
+  { username: 'mehmet', email: 'mehmet@example.com', phone: '05551110003', fullName: 'Mehmet Kaya',    bio: null },
+  { username: 'zeynep', email: 'zeynep@example.com', phone: '05551110004', fullName: 'Zeynep Sahin',   bio: 'Musait degilim' },
+  { username: 'can',    email: 'can@example.com',    phone: '05551110005', fullName: 'Can Ozturk',     bio: null },
 ];
 
 async function main() {

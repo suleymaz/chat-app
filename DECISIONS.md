@@ -617,3 +617,54 @@ boş kaydediliyordu. Altı yerde aynı hata vardı, .trim().min(1) olarak düzel
 Son görülme bilgisi yanlış çalışıyordu. Sunucu tarihi gönderiyordu ama cevrimiciProvider'ın
 durumu Map<String, bool> olduğu için tutacak yer yoktu. Çevrimiçi bilgisiyle tarihi birlikte
 tutan bir nesneye çevirdim.
+
+
+## Gün 15 — Medya Adresleri, Profil Sekmeleri ve Türkçeleştirme
+
+Avatar her açılışta baş harflerden fotoğrafa geçiş yapıyordu. Sebebi CachedNetworkImage'in
+varsayılan geçiş süreleriymiş: 500 ms giriş, 1 sn placeholder solması, üstelik önbellekteki
+görsel için bile oynuyor. Süreleri sıfırladım, görseli ekrandaki boyutunda çözdürdüm.
+
+Asıl sorun bunu incelerken çıktı: medya adresleri veritabanına mutlak yazılıyordu. Bilgisayarın
+IP'si değişince kayıtlı bütün avatarlar ve ekler kırılıyordu; nitekim ertesi gün DHCP yeni
+adres verince tam olarak bu oldu. Sunucu artık göreli yol dönüyor, tam adresi istemci kendi
+yapılandırmasından birleştiriyor. Bunu ilk yazdığımda sunucu kökünü socketUrl'den türetmiştim;
+yalnızca API_URL verilip SOCKET_URL verilmeyen bir derlemede görseller sessizce yanlış adrese
+gidiyordu. API adresinden türetmeye çevirdim, tek ayar yetiyor. Mevcut 14 kayıt göreliye
+dönüştürüldü, kullanılmayan BASE_URL ayarı kaldırıldı.
+
+Profil ve ayarlara ayrı sayfalardan gidiliyordu; Telegram'daki gibi alt menüye taşıdım:
+sohbetler, profil, ayarlar. Sekmeleri IndexedStack'te tutuyorum, sekme değişince ekranlar
+baştan kurulmuyor. Bunun bir yan etkisi oldu: profil ekranı artık sürekli açık durduğu için
+initState bir kez çalışıyor ve alanlar bayat kalabiliyordu. Kullanıcı bilgisi değiştiğinde
+dokunulmamış alanları tazeleyen bir dinleyici ekledim, yazılan değer ezilmiyor.
+
+Sohbet başlığındaki isme dokununca kişi kartı açılıyor: telefon, e-posta, hakkında ve canlı
+çevrimiçi durumu. Kart bu bilgileri ayrı bir istekle çekiyor, çünkü sohbet detayı yanıtı
+yalnızca başlıkta gerekenleri taşıyor. İletişim bilgisini her sohbet yanıtına eklemektense
+nadiren açılan kartta istemeyi tercih ettim.
+
+Kullanıcı adı, e-posta ve telefon değişimi artık mevcut şifreyi istiyor. Bunlar hesaba giriş
+için kullanılan alanlar; açık kalmış bir oturumu ele geçiren kişi şifreyi bilmeden giriş
+bilgilerini değiştirip hesabı tamamen devralabilirdi. Doğrulama iki katmanlı: şema şifresiz
+isteği reddediyor, servis de şifreyi karşılaştırıyor.
+
+Telefon biçimini +905XXXXXXXXX yerine 05XXXXXXXXX yaptım. Burada sadece deseni değiştirmek
+yetmezdi: telefon giriş kimliklerinden biri ve veritabanında tam eşleşme aranıyor, yani kayıtta
++90'lı yazan kullanıcı girişte 0'lı yazınca hesabını bulamazdı. Numarayı kaydetmeden önce tek
+biçime indirgeyen bir normalleştirici yazdım; boşluklu, tireli, +90'lı veya başında sıfırsız
+yazımların hepsi aynı kayda denk geliyor. Kayıtlı sekiz numara dönüştürüldü.
+
+Arayüzde ve hata mesajlarında Türkçe karakter kullanılmıyordu. Önce sözlükle otomatik çevirmeyi
+denedim, "acabilecek" kelimesini "acabileçek" yapınca vazgeçtim; kelime kökü değiştirmek
+Türkçede güvenli değil. Metinleri tek tek eşleştirdim: 80 sunucu mesajı, 130 arayüz metni. Log
+kayıtlarına ve kod yorumlarına dokunmadım, onlar geliştiriciye bakıyor. Bir de giriş
+alanlarındaki ipucu metni gerçek yazıyla aynı koyuluktaydı ve alan doluymuş gibi görünüyordu;
+tema seviyesinde soluklaştırdım.
+
+Arşivlenen sohbetlerde liste güncellenmiyordu. Sohbet listesi ve arşiv listesi ayrı
+provider'lar, socket olaylarını dağıtan katman ise yalnızca birincisini tazeliyordu. Arşivdeki
+bir sohbete mesaj gelince liste eski mesajı göstermeye devam ediyor, sohbeti açıp okusan bile
+okunmamış rozeti kalıyordu. Dört noktada arşiv listesi de tazeleniyor artık; arşiv ekranı hiç
+açılmadıysa provider'ı yaratıp boşuna istek atmamak için varlık kontrolü koydum. Sunucu
+tarafını ayrıca test ettim, orada sorun yoktu; veri hep doğruydu, uygulama sormuyordu.

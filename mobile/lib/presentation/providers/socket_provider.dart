@@ -103,6 +103,19 @@ class SocketKoordinator {
     _abonelikler.add(servis.durum.listen(_durumGeldi));
   }
 
+  /// Sohbet ve arsiv listelerini birlikte tazeler.
+  ///
+  /// Arsiv ayri bir provider oldugu icin socket olaylari ona ulasmiyordu:
+  /// arsivdeki bir sohbete mesaj gelince liste eski mesaji gostermeye devam
+  /// ediyordu. Arsiv listesi hic acilmadiysa olusturup bosuna istek atmiyoruz.
+  void _listeleriTazele() {
+    _ref.read(sohbetListesiProvider.notifier).tazelemeIste();
+
+    if (_ref.exists(arsivListesiProvider)) {
+      _ref.read(arsivListesiProvider.notifier).tazelemeIste();
+    }
+  }
+
   MesajParam _param(String conversationId) {
     final benimId = _ref.read(authProvider).kullanici?.id ?? '';
     return MesajParam(conversationId: conversationId, benimId: benimId);
@@ -117,7 +130,7 @@ class SocketKoordinator {
     }
 
     // Sohbet listesi tazelenince ilgili sohbet ustte cikar
-    _ref.read(sohbetListesiProvider.notifier).tazelemeIste();
+    _listeleriTazele();
   }
 
   // Bu olay sadece tik durumunu etkiliyor, liste sirasini degistirmiyor.
@@ -149,7 +162,7 @@ class SocketKoordinator {
     }
 
     // Son mesaj silindiyse listede "Bu mesaj silindi" gorunmeli
-    _ref.read(sohbetListesiProvider.notifier).tazelemeIste();
+    _listeleriTazele();
   }
 
   void _yaziyorGeldi(YaziyorOlayi olay) {

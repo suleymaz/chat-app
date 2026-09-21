@@ -125,8 +125,12 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
         ref.read(socketServiceProvider).baglan();
 
         // Arka plandayken socket kapali oldugu icin gelen mesajlar listeye
-        // dusmemis olabilir; one gelince liste tazeleniyor.
+        // dusmemis olabilir; one gelince listeler tazeleniyor.
         ref.read(sohbetListesiProvider.notifier).tazelemeIste();
+
+        if (ref.exists(arsivListesiProvider)) {
+          ref.read(arsivListesiProvider.notifier).tazelemeIste();
+        }
 
         // Ilk acilista kaydedilemeyen FCM token'i icin ikinci sans
         ref.read(pushServiceProvider).tokenKaydetGerekiyorsa();

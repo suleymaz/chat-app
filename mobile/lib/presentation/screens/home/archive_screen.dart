@@ -35,7 +35,7 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
     if (!basarili) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Arsivden cikarilamadi, baglantini kontrol et'),
+          content: Text('Arşivden çıkarılamadı, bağlantını kontrol et'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -47,7 +47,7 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${sohbet.user.fullName} arsivden cikarildi'),
+        content: Text('${sohbet.user.fullName} arşivden çıkarıldı'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -59,12 +59,12 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
     final benimId = ref.watch(authProvider).kullanici?.id ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Arsiv')),
+      appBar: AppBar(title: const Text('Arşiv')),
       body: sohbetler.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (hata, _) => BosDurum(
           icon: Icons.cloud_off_outlined,
-          baslik: 'Arsiv yuklenemedi',
+          baslik: 'Arşiv yüklenemedi',
           aksiyon: FilledButton(
             onPressed: () => ref.read(arsivListesiProvider.notifier).yukle(),
             child: const Text('Tekrar dene'),
@@ -74,8 +74,8 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
           if (liste.isEmpty) {
             return const BosDurum(
               icon: Icons.archive_outlined,
-              baslik: 'Arsiv bos',
-              aciklama: 'Arsivledigin sohbetler burada gorunur',
+              baslik: 'Arşiv boş',
+              aciklama: 'Arşivlediğin sohbetler burada görünür',
             );
           }
 
@@ -110,7 +110,7 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.unarchive_outlined),
-              title: const Text('Arsivden cikar'),
+              title: const Text('Arşivden çıkar'),
               onTap: () {
                 Navigator.pop(context);
                 _arsivdenCikar(sohbet);

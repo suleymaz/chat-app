@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../widgets/bos_durum.dart';
-import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/sohbet_satiri.dart';
 import '../../providers/socket_provider.dart';
 import '../../../data/models/conversation_model.dart';
@@ -34,7 +33,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final sohbetler = ref.watch(sohbetListesiProvider);
     final benimId = ref.watch(authProvider).kullanici?.id ?? '';
-    final kullanici = ref.watch(authProvider).kullanici;
 
     return Scaffold(
       appBar: AppBar(
@@ -42,26 +40,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.archive_outlined),
-            tooltip: 'Arsiv',
+            tooltip: 'Arşiv',
             onPressed: () => context.push(Rotalar.archive),
           ),
           IconButton(
             icon: const Icon(Icons.search),
-            tooltip: 'Kullanici ara',
+            tooltip: 'Kullanıcı ara',
             onPressed: () => context.push(Rotalar.search),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12, left: 4),
-            child: GestureDetector(
-              onTap: () => context.push(Rotalar.profile),
-              child: Center(
-                child: KullaniciAvatar(
-                  avatarUrl: kullanici?.avatarUrl,
-                  basHarfler: kullanici?.basHarfler ?? '?',
-                  boyut: 34,
-                ),
-              ),
-            ),
           ),
         ],
       ),
@@ -77,12 +62,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ListView(),
                   BosDurum(
                     icon: Icons.forum_outlined,
-                    baslik: 'Henuz sohbetin yok',
-                    aciklama: 'Birine mesaj gondererek baslayabilirsin',
+                    baslik: 'Henüz sohbetin yok',
+                    aciklama: 'Birine mesaj göndererek başlayabilirsin',
                     aksiyon: FilledButton.icon(
                       onPressed: () => context.push(Rotalar.search),
                       icon: const Icon(Icons.person_search, size: 18),
-                      label: const Text('Kullanici ara'),
+                      label: const Text('Kullanıcı ara'),
                     ),
                   ),
                 ],
@@ -125,8 +110,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _hataDurumu(WidgetRef ref) {
     return BosDurum(
       icon: Icons.cloud_off_outlined,
-      baslik: 'Sohbetler yuklenemedi',
-      aciklama: 'Internet baglantini kontrol edip tekrar dene',
+      baslik: 'Sohbetler yüklenemedi',
+      aciklama: 'İnternet bağlantını kontrol edip tekrar dene',
       aksiyon: FilledButton.icon(
         onPressed: () => ref.read(sohbetListesiProvider.notifier).yukle(),
         icon: const Icon(Icons.refresh, size: 18),
@@ -156,7 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.archive_outlined),
-              title: const Text('Arsivle'),
+              title: const Text('Arşivle'),
               onTap: () {
                 Navigator.pop(context);
                 _arsivle(sohbet);
@@ -182,9 +167,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Sohbet silinsin mi?'),
         content: Text(
-          '${sohbet.user.fullName} ile olan sohbet ve mesaj gecmisi sizin icin '
-          'silinecek. Karsi taraf sohbeti gormeye devam eder; tekrar yazisirsaniz '
-          'sohbet bos olarak yeniden baslar.',
+          '${sohbet.user.fullName} ile olan sohbet ve mesaj geçmişi sizin için '
+          'silinecek. Karşı taraf sohbeti görmeye devam eder; tekrar yazışırsanız '
+          'sohbet boş olarak yeniden başlar.',
         ),
         actions: [
           TextButton(
@@ -207,14 +192,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final basarili = await ref.read(sohbetListesiProvider.notifier).arsivle(sohbet.id, true);
     if (!mounted) return;
 
+    // Arsiv ekrani daha once acildiysa yeni sohbet orada da gorunmeli
+    if (basarili && ref.exists(arsivListesiProvider)) {
+      ref.read(arsivListesiProvider.notifier).tazele();
+    }
+
     if (!basarili) {
-      _uyari('Sohbet arsivlenemedi, baglantini kontrol et');
+      _uyari('Sohbet arşivlenemedi, bağlantını kontrol et');
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${sohbet.user.fullName} arsivlendi'),
+        content: Text('${sohbet.user.fullName} arşivlendi'),
         duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Geri al',
@@ -229,7 +219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted) return;
 
     if (!basarili) {
-      _uyari('Geri alinamadi, baglantini kontrol et');
+      _uyari('Geri alınamadı, bağlantını kontrol et');
       return;
     }
 
@@ -241,7 +231,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted) return;
 
     if (!basarili) {
-      _uyari('Sohbet silinemedi, baglantini kontrol et');
+      _uyari('Sohbet silinemedi, bağlantını kontrol et');
       return;
     }
 

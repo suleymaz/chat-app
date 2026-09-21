@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/tarih_formatla.dart';
 import '../../data/models/message_model.dart';
@@ -142,7 +143,7 @@ class MesajBalonu extends StatelessWidget {
                   errorBuilder: (context, error, stack) => _gorselHatasi(),
                 )
               : CachedNetworkImage(
-                  imageUrl: ek!.url,
+                  imageUrl: AppConfig.medyaUrl(ek!.url),
                   width: 220,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => Container(
@@ -245,7 +246,7 @@ class MesajBalonu extends StatelessWidget {
                           style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
                         ),
                         Text(
-                          indiriliyor ? 'indiriliyor' : 'acmak icin dokun',
+                          indiriliyor ? 'indiriliyor' : 'açmak için dokun',
                           style: const TextStyle(fontSize: 12, color: AppColors.primary),
                         ),
                       ],

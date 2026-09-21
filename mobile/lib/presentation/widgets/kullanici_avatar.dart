@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 
 class KullaniciAvatar extends StatelessWidget {
@@ -18,6 +19,11 @@ class KullaniciAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Gorseli ekrandaki boyutunda cozuyoruz; tam cozunurluklu avatari bellekte
+    // tutmanin anlami yok, cozme suresi de placeholder'i uzatiyor
+    final pikselOrani = MediaQuery.devicePixelRatioOf(context);
+    final onbellekGenisligi = (boyut * pikselOrani).round();
+
     return SizedBox(
       width: boyut,
       height: boyut,
@@ -27,10 +33,17 @@ class KullaniciAvatar extends StatelessWidget {
             borderRadius: BorderRadius.circular(boyut / 2),
             child: avatarUrl != null
                 ? CachedNetworkImage(
-                    imageUrl: avatarUrl!,
+                    imageUrl: AppConfig.medyaUrl(avatarUrl!),
                     width: boyut,
                     height: boyut,
                     fit: BoxFit.cover,
+                    memCacheWidth: onbellekGenisligi,
+                    memCacheHeight: onbellekGenisligi,
+                    // Varsayilan gecis suresi 500 ms, placeholder'in solmasi 1 sn.
+                    // Onbellekteki gorsel icin bile bu animasyon oynadigi icin her
+                    // acilista bas harflerden fotografa gecis izleniyordu.
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
                     placeholder: (context, url) => _harfler(),
                     errorWidget: (context, url, error) => _harfler(),
                   )

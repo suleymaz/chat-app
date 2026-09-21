@@ -77,8 +77,11 @@ export const gorselIsle = async (dosyaYolu, { maxGenislik = 1280, kalite = 80 } 
 };
 
 // Dosya yolundan public URL uretir
+// Goreli yol uretiliyor, sunucu adresi eklenmiyor. Mutlak adres kaydedilseydi
+// sunucunun IP'si veya alan adi degistiginde veritabanindaki butun gorseller
+// kirilirdi; adresi istemci kendi yapilandirmasindan birlestiriyor.
 export const urlUret = (altKlasor, dosyaAdi) =>
-  `${env.BASE_URL}/${env.UPLOAD_DIR}/${altKlasor}/${dosyaAdi}`;
+  `/${env.UPLOAD_DIR}/${altKlasor}/${dosyaAdi}`;
 
 // URL'den disk yolunu bulup dosyayi siler
 export const dosyaSil = async (url) => {

@@ -10,6 +10,22 @@ class AppConfig {
     defaultValue: 'http://10.0.2.2:5000',
   );
 
+  /// Sunucu gorsel ve dosya adreslerini goreli donuyor (/uploads/...).
+  /// Tam adres burada birlestiriliyor, boylece sunucunun adresi degistiginde
+  /// veritabanindaki kayitlara dokunmak gerekmiyor.
+  ///
+  /// Eski kayitlar mutlak adresle yazilmisti; onlar oldugu gibi donuyor.
+  /// Sunucu koku, API adresinden turetiliyor. socketUrl'den turetseydik
+  /// yalnizca API_URL verilip SOCKET_URL verilmeyen bir derlemede gorseller
+  /// sessizce yanlis adrese giderdi.
+  static String get sunucuKoku => apiUrl.replaceFirst(RegExp(r'/api/v\d+/?$'), '');
+
+  static String medyaUrl(String yol) {
+    if (yol.isEmpty || yol.startsWith('http')) return yol;
+
+    return yol.startsWith('/') ? '$sunucuKoku$yol' : '$sunucuKoku/$yol';
+  }
+
   static const Duration baglantiSuresi = Duration(seconds: 15);
   static const Duration yanitSuresi = Duration(seconds: 20);
 

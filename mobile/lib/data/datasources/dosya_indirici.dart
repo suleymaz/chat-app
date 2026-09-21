@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/config/app_config.dart';
+
 /// Mesaj eklerini uygulamaya ozel klasore indirir ve sistem uygulamasiyla acar.
 ///
 /// Uygulamanin kendi klasorune yazdigi icin Android/iOS'ta ek depolama izni
@@ -33,7 +35,7 @@ class DosyaIndirici {
       return yol;
     }
 
-    await _dio.download(url, yol);
+    await _dio.download(AppConfig.medyaUrl(url), yol);
     return yol;
   }
 
@@ -46,13 +48,13 @@ class DosyaIndirici {
       case ResultType.done:
         return null;
       case ResultType.noAppToOpen:
-        return 'Bu dosya turunu acabilecek bir uygulama bulunamadi';
+        return 'Bu dosya türünü açabilecek bir uygulama bulunamadı';
       case ResultType.permissionDenied:
-        return 'Dosyayi acmak icin izin verilmedi';
+        return 'Dosyayı açmak için izin verilmedi';
       case ResultType.fileNotFound:
-        return 'Dosya bulunamadi';
+        return 'Dosya bulunamadı';
       case ResultType.error:
-        return 'Dosya acilamadi';
+        return 'Dosya açılamadı';
     }
   }
 

@@ -17,7 +17,6 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default("uploads"),
   MAX_FILE_SIZE: z.coerce.number().default(5 * 1024 * 1024),
   MAX_DOCUMENT_SIZE: z.coerce.number().default(20 * 1024 * 1024),
-  BASE_URL: z.string().default("http://localhost:5000"),
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
 
   // Virgulle ayrilmis origin listesi. Uretimde daraltilmali, gelistirmede "*"

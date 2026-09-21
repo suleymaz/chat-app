@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/utils/tarih_formatla.dart';
 
 /// Sohbetteki gorseli tam ekran gosterir. Parmakla yakinlastirilabilir.
@@ -68,7 +69,7 @@ class GorselOnizleme extends StatelessWidget {
     if (url == null) return _hata();
 
     return CachedNetworkImage(
-      imageUrl: url!,
+      imageUrl: AppConfig.medyaUrl(url!),
       fit: BoxFit.contain,
       placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
       errorWidget: (context, url, error) => _hata(),
@@ -81,7 +82,7 @@ class GorselOnizleme extends StatelessWidget {
       children: [
         Icon(Icons.broken_image_outlined, size: 56, color: Colors.white54),
         SizedBox(height: 12),
-        Text('Gorsel yuklenemedi', style: TextStyle(color: Colors.white70)),
+        Text('Görsel yüklenemedi', style: TextStyle(color: Colors.white70)),
       ],
     );
   }

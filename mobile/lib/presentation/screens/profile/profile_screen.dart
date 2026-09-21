@@ -7,6 +7,7 @@ import '../../../core/config/app_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/medya_secici.dart';
+import '../../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_text_field.dart';
@@ -24,6 +25,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _adController = TextEditingController();
   final _kullaniciAdiController = TextEditingController();
+  final _epostaController = TextEditingController();
+  final _telefonController = TextEditingController();
   final _bioController = TextEditingController();
 
   bool _kaydediliyor = false;
@@ -38,6 +41,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final kullanici = ref.read(authProvider).kullanici;
     _adController.text = kullanici?.fullName ?? '';
     _kullaniciAdiController.text = kullanici?.username ?? '';
+    _epostaController.text = kullanici?.email ?? '';
+    _telefonController.text = kullanici?.phone ?? '';
     _bioController.text = kullanici?.bio ?? '';
   }
 
@@ -45,6 +50,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void dispose() {
     _adController.dispose();
     _kullaniciAdiController.dispose();
+    _epostaController.dispose();
+    _telefonController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -56,13 +63,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     final ad = _adController.text.trim();
     final kullaniciAdi = _kullaniciAdiController.text.trim();
+    final eposta = _epostaController.text.trim();
+    final telefon = _telefonController.text.trim();
     final bio = _bioController.text.trim();
 
     if (ad != (kullanici?.fullName ?? '')) veriler['fullName'] = ad;
     if (kullaniciAdi != (kullanici?.username ?? '')) veriler['username'] = kullaniciAdi;
+    if (eposta != (kullanici?.email ?? '')) veriler['email'] = eposta;
+    if (telefon != (kullanici?.phone ?? '')) veriler['phone'] = telefon;
     if (bio != (kullanici?.bio ?? '')) veriler['bio'] = bio.isEmpty ? null : bio;
 
     return veriler;
+  }
+
+  // Hesaba giris icin kullanilan alanlar; degismeleri sifre onayi gerektiriyor
+  static const _kimlikAlanlari = ['username', 'email', 'phone'];
+
+  /// Kimlik alanlarini degistirmeden once mevcut şifreyi sorar.
+  /// Vazgeçilirse null döner.
+  Future<String?> _sifreSor() async {
+    final sifre = await showDialog<String>(
+      context: context,
+      builder: (context) => const _SifreOnayDiyalogu(),
+    );
+
+    return (sifre == null || sifre.isEmpty) ? null : sifre;
   }
 
   Future<void> _kaydet() async {
@@ -72,10 +97,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (veriler.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Degisiklik yok')),
+        const SnackBar(content: Text('Değişiklik yok')),
       );
       return;
     }
+
+    // Giris bilgileri degisiyorsa sunucu mevcut sifreyi istiyor
+    if (_kimlikAlanlari.any(veriler.containsKey)) {
+      final sifre = await _sifreSor();
+      if (sifre == null) return;
+
+      veriler['currentPassword'] = sifre;
+    }
+
+    if (!mounted) return;
 
     setState(() {
       _kaydediliyor = true;
@@ -89,18 +124,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil guncellendi')),
+        const SnackBar(content: Text('Profil güncellendi')),
       );
     } on DioException catch (e) {
       final hata = e.error;
       if (!mounted) return;
       setState(() {
-        _genelHata = hata is ApiException ? hata.message : 'Profil guncellenemedi';
+        _genelHata = hata is ApiException ? hata.message : 'Profil güncellenemedi';
         _alanHatalari = hata is ApiException ? hata.alanHatalari : null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _genelHata = 'Beklenmeyen bir hata olustu');
+      setState(() => _genelHata = 'Beklenmeyen bir hata oluştu');
     } finally {
       if (mounted) setState(() => _kaydediliyor = false);
     }
@@ -117,7 +152,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-              title: const Text('Galeriden sec'),
+              title: const Text('Galeriden seç'),
               onTap: () {
                 Navigator.pop(context);
                 _avatarYukle(galeriden: true);
@@ -125,7 +160,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
-              title: const Text('Fotograf cek'),
+              title: const Text('Fotoğraf çek'),
               onTap: () {
                 Navigator.pop(context);
                 _avatarYukle(galeriden: false);
@@ -135,7 +170,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: AppColors.error),
                 title: const Text(
-                  'Fotografi kaldir',
+                  'Fotoğrafı kaldır',
                   style: TextStyle(color: AppColors.error),
                 ),
                 onTap: () {
@@ -163,10 +198,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil fotografi guncellendi')),
+        const SnackBar(content: Text('Profil fotoğrafı güncellendi')),
       );
-    } catch (_) {
-      if (mounted) _uyari('Fotograf yuklenemedi');
+    } catch (hata) {
+      // Sunucunun sebebi gizlenmemeli; "yüklenemedi" demek hatayi bulunamaz
+      // hale getiriyordu
+      debugPrint('Avatar yuklenemedi: $hata');
+      if (mounted) _uyari(_hataMetni(hata, 'Fotoğraf yüklenemedi'));
     } finally {
       if (mounted) setState(() => _avatarYukleniyor = false);
     }
@@ -178,11 +216,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final guncel = await ref.read(userRepositoryProvider).avatarSil();
       ref.read(authProvider.notifier).kullaniciGuncelle(guncel);
-    } catch (_) {
-      if (mounted) _uyari('Fotograf kaldirilamadi');
+    } catch (hata) {
+      debugPrint('Avatar silinemedi: $hata');
+      if (mounted) _uyari(_hataMetni(hata, 'Fotoğraf kaldırılamadı'));
     } finally {
       if (mounted) setState(() => _avatarYukleniyor = false);
     }
+  }
+
+  // Sunucudan gelen aciklamayi kullanir, yoksa genel metne duser
+  String _hataMetni(Object hata, String varsayilan) {
+    final ic = hata is DioException ? hata.error : hata;
+    return ic is ApiException ? ic.message : varsayilan;
   }
 
   void _uyari(String mesaj) {
@@ -191,21 +236,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  // Kullanici bilgisi degistiginde (giris tamamlandi, profil kaydedildi)
+  // dokunulmamis alanlari tazeler. Kullanicinin yazdigi deger ezilmez.
+  void _alanlariTazele(UserModel? onceki, UserModel? yeni) {
+    void ayarla(TextEditingController kontrol, String? eskiDeger, String? yeniDeger) {
+      if (kontrol.text == (eskiDeger ?? '')) kontrol.text = yeniDeger ?? '';
+    }
+
+    ayarla(_adController, onceki?.fullName, yeni?.fullName);
+    ayarla(_kullaniciAdiController, onceki?.username, yeni?.username);
+    ayarla(_epostaController, onceki?.email, yeni?.email);
+    ayarla(_telefonController, onceki?.phone, yeni?.phone);
+    ayarla(_bioController, onceki?.bio, yeni?.bio);
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (onceki, yeni) {
+      if (onceki?.kullanici != yeni.kullanici) {
+        _alanlariTazele(onceki?.kullanici, yeni.kullanici);
+      }
+    });
+
     final kullanici = ref.watch(authProvider).kullanici;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Ayarlar',
-            onPressed: () => context.push(Rotalar.settings),
-          ),
-        ],
-      ),
+      // Ayarlara alt menuden gecildigi icin buradaki kisayol kaldirildi
+      appBar: AppBar(title: const Text('Profil')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Center(
@@ -239,7 +296,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     hataMetni: _alanHatalari?['fullName'],
                     dogrula: (deger) {
                       final metin = deger?.trim() ?? '';
-                      if (metin.length < 2) return 'Ad soyad en az 2 karakter olmali';
+                      if (metin.length < 2) return 'Ad soyad en az 2 karakter olmalı';
                       return null;
                     },
                   ),
@@ -247,7 +304,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   AppTextField(
                     controller: _kullaniciAdiController,
-                    label: 'Kullanici adi',
+                    label: 'Kullanıcı adı',
                     icon: Icons.alternate_email,
                     aktif: !_kaydediliyor,
                     maksUzunluk: 30,
@@ -255,10 +312,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     dogrula: (deger) {
                       final metin = deger?.trim() ?? '';
                       if (metin.length < 3) {
-                        return 'Kullanici adi en az 3 karakter olmali';
+                        return 'Kullanıcı adı en az 3 karakter olmalı';
                       }
                       if (!RegExp(r'^[a-z0-9_]+$').hasMatch(metin)) {
-                        return 'Sadece kucuk harf, rakam ve alt cizgi kullanilabilir';
+                        return 'Sadece küçük harf, rakam ve alt çizgi kullanılabilir';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  AppTextField(
+                    controller: _epostaController,
+                    label: 'E-posta',
+                    icon: Icons.mail_outline,
+                    aktif: !_kaydediliyor,
+                    klavyeTipi: TextInputType.emailAddress,
+                    hataMetni: _alanHatalari?['email'],
+                    dogrula: (deger) {
+                      final metin = deger?.trim() ?? '';
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(metin)) {
+                        return 'Geçerli bir e-posta adresi girin';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  AppTextField(
+                    controller: _telefonController,
+                    label: 'Telefon',
+                    hint: '05551234567',
+                    icon: Icons.phone_outlined,
+                    aktif: !_kaydediliyor,
+                    klavyeTipi: TextInputType.phone,
+                    maksUzunluk: 11,
+                    hataMetni: _alanHatalari?['phone'],
+                    dogrula: (deger) {
+                      final metin = deger?.trim() ?? '';
+                      if (!RegExp(r'^0[0-9]{10}$').hasMatch(metin)) {
+                        return 'Telefon 05XXXXXXXXX biçiminde olmalı';
                       }
                       return null;
                     },
@@ -267,8 +360,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   AppTextField(
                     controller: _bioController,
-                    label: 'Hakkinda',
-                    hint: 'Kendinden kisaca bahset',
+                    label: 'Hakkında',
+                    hint: 'Kendinden kısaca bahset',
                     icon: Icons.notes_outlined,
                     aktif: !_kaydediliyor,
                     maksUzunluk: 160,
@@ -287,7 +380,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   OutlinedButton.icon(
                     onPressed: () => context.push(Rotalar.changePassword),
                     icon: const Icon(Icons.lock_outline, size: 18),
-                    label: const Text('Sifre degistir'),
+                    label: const Text('Şifre değiştir'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -335,6 +428,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Şifre onayı diyaloğu.
+///
+/// Ayrı bir widget: controller'ı kendi dispose'unda kapatıyor. Diyalog
+/// kapandıktan hemen sonra çağıran taraftan dispose edilirse, kapanma
+/// animasyonu sürerken TextField kapatılmış controller'ı kullanmaya çalışıyor
+/// ve "used after being disposed" hatası veriyordu.
+class _SifreOnayDiyalogu extends StatefulWidget {
+  const _SifreOnayDiyalogu();
+
+  @override
+  State<_SifreOnayDiyalogu> createState() => _SifreOnayDiyaloguState();
+}
+
+class _SifreOnayDiyaloguState extends State<_SifreOnayDiyalogu> {
+  final _kontrol = TextEditingController();
+  bool _gizli = true;
+
+  @override
+  void dispose() {
+    _kontrol.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Şifrenizi doğrulayın'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Kullanıcı adı, e-posta ve telefon hesabınıza giriş için '
+            'kullanılıyor. Değiştirmek için şifrenizi girin.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _kontrol,
+            obscureText: _gizli,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Mevcut şifre',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _gizli ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                ),
+                onPressed: () => setState(() => _gizli = !_gizli),
+              ),
+            ),
+            onSubmitted: (deger) => Navigator.pop(context, deger),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Vazgeç'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _kontrol.text),
+          child: const Text('Onayla'),
+        ),
+      ],
     );
   }
 }

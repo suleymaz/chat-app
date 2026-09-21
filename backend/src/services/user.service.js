@@ -3,6 +3,7 @@ import * as blockRepo from "../repositories/block.repository.js";
 import * as tokenRepo from "../repositories/refreshToken.repository.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
 import { ApiError } from "../utils/ApiError.js";
+import { kimlikAlanlari } from "../validators/user.validator.js";
 import logger from "../utils/logger.js";
 import * as fileService from "./file.service.js";
 
@@ -10,36 +11,70 @@ export const getMyProfile = async (userId) => {
   const kullanici = await userRepo.findById(userId);
 
   if (!kullanici) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   return kullanici;
 };
 
 export const updateProfile = async (userId, veriler) => {
-  // Kullanici adi degisiyorsa baskasi tarafindan alinmis mi kontrol et
-  if (veriler.username) {
-    const mevcut = await userRepo.findByUsername(veriler.username);
+  const { currentPassword, ...guncellenecek } = veriler;
 
-    if (mevcut && mevcut.id !== userId) {
-      throw ApiError.conflict("Bu kullanici adi zaten kullaniliyor", "USERNAME_TAKEN");
+  // Kimlik alanlari degisiyorsa once sifre dogrulanir. Boylece acik kalmis bir
+  // oturumu ele geciren kisi hesabin giris bilgilerini degistiremiyor.
+  const degisenKimlikAlani = kimlikAlanlari.filter(
+    (alan) => guncellenecek[alan] !== undefined
+  );
+
+  if (degisenKimlikAlani.length > 0) {
+    const kullanici = await userRepo.findByIdWithPassword(userId);
+
+    if (!kullanici) {
+      throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
+    }
+
+    const dogruMu = await comparePassword(currentPassword, kullanici.passwordHash);
+
+    if (!dogruMu) {
+      throw ApiError.unauthorized("Şifreniz hatalı", "INVALID_CURRENT_PASSWORD");
+    }
+
+    // Degismeyen alanlari sorguya sokmuyoruz, kullanici kendi degeriyle
+    // catismasin diye
+    const degisenler = {};
+    for (const alan of degisenKimlikAlani) {
+      if (guncellenecek[alan] !== kullanici[alan]) degisenler[alan] = guncellenecek[alan];
+    }
+
+    if (Object.keys(degisenler).length > 0) {
+      const sahip = await userRepo.existsByUniqueFields(degisenler);
+
+      if (sahip && sahip.id !== userId) {
+        if (degisenler.username && sahip.username === degisenler.username) {
+          throw ApiError.conflict("Bu kullanıcı adı zaten kullanılıyor", "USERNAME_TAKEN");
+        }
+        if (degisenler.email && sahip.email === degisenler.email) {
+          throw ApiError.conflict("Bu e-posta adresi zaten kullanılıyor", "EMAIL_TAKEN");
+        }
+        throw ApiError.conflict("Bu telefon numarası zaten kullanılıyor", "PHONE_TAKEN");
+      }
     }
   }
 
-  return userRepo.update(userId, veriler);
+  return userRepo.update(userId, guncellenecek);
 };
 
 export const changePassword = async (userId, { currentPassword, newPassword }) => {
   const kullanici = await userRepo.findByIdWithPassword(userId);
 
   if (!kullanici) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const dogruMu = await comparePassword(currentPassword, kullanici.passwordHash);
 
   if (!dogruMu) {
-    throw ApiError.unauthorized("Mevcut sifre hatali", "INVALID_CURRENT_PASSWORD");
+    throw ApiError.unauthorized("Mevcut şifre hatalı", "INVALID_CURRENT_PASSWORD");
   }
 
   const yeniHash = await hashPassword(newPassword);
@@ -67,13 +102,13 @@ export const getUserProfile = async (userId, hedefId) => {
   const engelli = await blockRepo.engelVarMi(userId, hedefId);
 
   if (engelli) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const profil = await userRepo.findProfileById(hedefId);
 
   if (!profil) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   return profil;
@@ -87,13 +122,13 @@ export const blockUser = async (userId, hedefId) => {
   const hedef = await userRepo.findById(hedefId);
 
   if (!hedef) {
-    throw ApiError.notFound("Kullanici bulunamadi", "USER_NOT_FOUND");
+    throw ApiError.notFound("Kullanıcı bulunamadı", "USER_NOT_FOUND");
   }
 
   const mevcut = await blockRepo.findByPair(userId, hedefId);
 
   if (mevcut) {
-    throw ApiError.conflict("Bu kullanici zaten engellenmis", "ALREADY_BLOCKED");
+    throw ApiError.conflict("Bu kullanıcı zaten engellenmiş", "ALREADY_BLOCKED");
   }
 
   await blockRepo.create(userId, hedefId);
@@ -104,7 +139,7 @@ export const unblockUser = async (userId, hedefId) => {
   const mevcut = await blockRepo.findByPair(userId, hedefId);
 
   if (!mevcut) {
-    throw ApiError.notFound("Bu kullanici engellenmemis", "NOT_BLOCKED");
+    throw ApiError.notFound("Bu kullanıcı engellenmemiş", "NOT_BLOCKED");
   }
 
   await blockRepo.remove(userId, hedefId);
@@ -143,7 +178,7 @@ export const avatarSil = async (userId) => {
   const kullanici = await userRepo.findById(userId);
 
   if (!kullanici?.avatarUrl) {
-    throw ApiError.notFound("Profil fotografi bulunamadi", "NO_AVATAR");
+    throw ApiError.notFound("Profil fotoğrafı bulunamadı", "NO_AVATAR");
   }
 
   await fileService.dosyaSil(kullanici.avatarUrl);

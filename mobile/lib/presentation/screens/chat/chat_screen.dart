@@ -20,6 +20,7 @@ import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/mesaj_balonu.dart';
 import '../../widgets/yaziyor_gostergesi.dart';
 import 'gorsel_onizleme.dart';
+import 'kisi_detay_ekrani.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -90,7 +91,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!_yeniSohbet) {
         _socketServis.sohbeteKatil(widget.conversationId);
         ref.read(mesajProvider(_param).notifier).okunduIsaretle();
-        ref.read(sohbetListesiProvider.notifier).okunduIsaretle(widget.conversationId);
+        _okunduIsaretleListelerde();
       }
     });
   }
@@ -199,7 +200,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(yeniDurum ? 'Sohbet sessize alindi' : 'Sohbetin sesi acildi'),
+          content: Text(yeniDurum ? 'Sohbet sessize alındı' : 'Sohbetin sesi acildi'),
         ),
       );
     } catch (_) {
@@ -208,7 +209,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Islem tamamlanamadi, baglantini kontrol et'),
+          content: Text('İşlem tamamlanamadı, bağlantını kontrol et'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -226,9 +227,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         builder: (context) => AlertDialog(
           title: Text('${kullanici.fullName} engellensin mi?'),
           content: const Text(
-            'Engellenen kullanici sana mesaj gonderemez, '
-            'cevrimici durumunu ve profilini goremez. '
-            'Bu islemi istedigin zaman geri alabilirsin.',
+            'Engellenen kullanıcı sana mesaj gönderemez, '
+            'çevrimiçi durumunu ve profilini göremez. '
+            'Bu işlemi istediğin zaman geri alabilirsin.',
           ),
           actions: [
             TextButton(
@@ -266,7 +267,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           content: Text(
             _engellendi
                 ? '${kullanici.fullName} engellendi'
-                : '${kullanici.fullName} icin engel kaldirildi',
+                : '${kullanici.fullName} için engel kaldırıldı',
           ),
         ),
       );
@@ -274,7 +275,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Islem tamamlanamadi, baglantini kontrol et'),
+          content: Text('İşlem tamamlanamadı, bağlantını kontrol et'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -397,7 +398,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-              title: const Text('Galeriden sec'),
+              title: const Text('Galeriden seç'),
               onTap: () {
                 Navigator.pop(context);
                 _gorselSec(galeriden: true);
@@ -405,7 +406,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
-              title: const Text('Fotograf cek'),
+              title: const Text('Fotoğraf çek'),
               onTap: () {
                 Navigator.pop(context);
                 _gorselSec(galeriden: false);
@@ -413,7 +414,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.attach_file, color: AppColors.primary),
-              title: const Text('Dosya gonder'),
+              title: const Text('Dosya gönder'),
               onTap: () {
                 Navigator.pop(context);
                 _dosyaSec();
@@ -451,7 +452,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (_sohbetOlustuysaTasi(notifier)) return;
       _enAltaKaydir();
     } catch (_) {
-      _uyari('Gorsel secilemedi');
+      _uyari('Görsel seçilemedi');
     }
   }
 
@@ -516,7 +517,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final hata = await ref.read(dosyaIndiriciProvider).ac(yol);
       if (hata != null) _uyari(hata);
     } catch (_) {
-      _uyari('Dosya indirilemedi, baglantini kontrol et');
+      _uyari('Dosya indirilemedi, bağlantını kontrol et');
     } finally {
       if (mounted) setState(() => _indirilenler.remove(mesaj.id));
     }
@@ -582,7 +583,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _eslesmeler = [];
         _aktifEslesme = 0;
       });
-      _uyari('Arama yapilamadi');
+      _uyari('Arama yapılamadı');
     } finally {
       if (mounted) setState(() => _aramaYukleniyor = false);
     }
@@ -607,7 +608,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!mounted) return;
 
     if (!bulundu) {
-      _uyari('Mesaj yuklenemedi');
+      _uyari('Mesaj yüklenemedi');
       return;
     }
 
@@ -677,7 +678,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } else if (!terimVar) {
       metin = 'En az 2 karakter yaz';
     } else if (toplam == 0) {
-      metin = 'Sonuc bulunamadi';
+      metin = 'Sonuç bulunamadı';
     } else {
       metin = '${_aktifEslesme + 1}/$toplam';
     }
@@ -704,7 +705,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_up),
-            tooltip: 'Onceki (daha eski)',
+            tooltip: 'Önceki (daha eski)',
             visualDensity: VisualDensity.compact,
             color: AppColors.primary,
             onPressed: _aktifEslesme < toplam - 1 ? () => _eslesmeDegistir(1) : null,
@@ -736,7 +737,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _socketServis.sohbeteKatil(widget.conversationId);
       ref.read(mesajProvider(_param).notifier).tazele();
       ref.read(mesajProvider(_param).notifier).okunduIsaretle();
-      ref.read(sohbetListesiProvider.notifier).okunduIsaretle(widget.conversationId);
+      _okunduIsaretleListelerde();
     });
 
     // Sohbet ekrani acikken gelen mesajlar hemen okundu isaretlenir
@@ -784,14 +785,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Bu kullaniciyi engelledin',
+              'Bu kullanıcıyı engelledin',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             TextButton(
               onPressed: _engelIslemde ? null : _engelDegistir,
-              child: Text(_engelIslemde ? 'Kaldiriliyor...' : 'Engeli kaldir'),
+              child: Text(_engelIslemde ? 'Kaldırılıyor...' : 'Engeli kaldır'),
             ),
           ],
         ),
@@ -850,7 +851,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       color: _engellendi ? null : AppColors.error,
                     ),
                     const SizedBox(width: 12),
-                    Text(_engellendi ? 'Engeli kaldir' : 'Engelle'),
+                    Text(_engellendi ? 'Engeli kaldır' : 'Engelle'),
                   ],
                 ),
               ),
@@ -858,8 +859,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
       ],
       title: _karsiTarafYukleniyor
-          ? const Text('Yukleniyor...')
-          : Row(
+          ? const Text('Yükleniyor...')
+          : GestureDetector(
+              // Basliga dokununca kisi karti aciliyor
+              behavior: HitTestBehavior.opaque,
+              onTap: _kisiDetayiniAc,
+              child: Row(
               children: [
                 KullaniciAvatar(
                   avatarUrl: _karsiTaraf?.avatarUrl,
@@ -880,7 +885,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       if (_karsiTaraf != null)
                         Text(
                           yaziyor
-                              ? 'yaziyor...'
+                              ? 'yazıyor...'
                               : cevrimici
                                   ? 'cevrimici'
                                   : 'son gorulme ${TarihFormat.sonGorulme(sonGorulme)}',
@@ -895,7 +900,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
               ],
+              ),
             ),
+    );
+  }
+
+  /// Okunmamis sayacini hem sohbet hem arsiv listesinde sifirlar.
+  /// Arsivden acilan bir sohbette yalnizca ana liste guncellenince, arsiv
+  /// ekranina donuldugunde okunmamis rozeti duruyordu.
+  void _okunduIsaretleListelerde() {
+    ref.read(sohbetListesiProvider.notifier).okunduIsaretle(widget.conversationId);
+
+    if (ref.exists(arsivListesiProvider)) {
+      ref.read(arsivListesiProvider.notifier).okunduIsaretle(widget.conversationId);
+    }
+  }
+
+  void _kisiDetayiniAc() {
+    final kullanici = _karsiTaraf;
+    if (kullanici == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => KisiDetayEkrani(kullanici: kullanici)),
     );
   }
 
@@ -933,7 +959,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               const SizedBox(height: 12),
               Text(
                 _karsiTaraf != null
-                    ? '${_karsiTaraf!.fullName} ile sohbete basla'
+                    ? '${_karsiTaraf!.fullName} ile sohbete başla'
                     : 'Sohbete basla',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
@@ -1012,7 +1038,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
-              tooltip: 'Ek gonder',
+              tooltip: 'Ek gönder',
               onPressed: _ekMenusu,
             ),
             Expanded(

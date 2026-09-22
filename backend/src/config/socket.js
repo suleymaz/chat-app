@@ -88,15 +88,11 @@ const baglantiKur = async (socket) => {
   const oncekiSayi = bagliKullanicilar.get(userId) ?? 0;
   bagliKullanicilar.set(userId, oncekiSayi + 1);
 
-  // Ilk baglanti ise cevrimici olarak isaretle
-  if (oncekiSayi === 0) {
-    await userRepo.update(userId, { isOnline: true });
-    socket.broadcast.emit("user:online", { userId });
-    logger.info(`Kullanici cevrimici: ${username}`);
-
-    // Cevrimdisiyken gelen mesajlar simdi iletilmis sayilir
-    await bekleyenMesajlariIlet(userId);
-  }
+  // Dinleyiciler her seyden once baglanmali. Asagidaki cevrimici isaretleme
+  // await icerdigi icin, dinleyiciler ondan sonra baglandiginda arada gelen
+  // olaylar sessizce dusuyordu: conversation:join kacirilinca yaziyor
+  // gostergesi calismiyor, disconnect kacirilinca da kullanici kalici olarak
+  // cevrimici gorunuyordu.
 
   // Sohbet odasina katilma - yaziyor gostergesi icin.
   // Sadece sohbetin katilimcisi odaya girebilir.
@@ -157,6 +153,16 @@ const baglantiKur = async (socket) => {
       bagliKullanicilar.set(userId, kalanSayi);
     }
   });
+
+  // Ilk baglanti ise cevrimici olarak isaretle
+  if (oncekiSayi === 0) {
+    await userRepo.update(userId, { isOnline: true });
+    socket.broadcast.emit("user:online", { userId });
+    logger.info(`Kullanici cevrimici: ${username}`);
+
+    // Cevrimdisiyken gelen mesajlar simdi iletilmis sayilir
+    await bekleyenMesajlariIlet(userId);
+  }
 };
 
 export const getIO = () => {

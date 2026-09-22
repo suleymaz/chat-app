@@ -3,6 +3,8 @@ import { env } from '../config/env.js';
 
 const logger = winston.createLogger({
   level: env.NODE_ENV === 'development' ? 'debug' : 'info',
+  // Testlerde morgan her istegi loglayip ciktiyi okunmaz hale getiriyor
+  silent: env.NODE_ENV === 'test',
   format: winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),

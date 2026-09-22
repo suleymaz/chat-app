@@ -1,9 +1,15 @@
 import rateLimit from 'express-rate-limit';
 import { ApiError } from '../utils/ApiError.js';
 
+import { env } from '../config/env.js';
+
 const handler = (req, res, next) => {
   next(ApiError.tooManyRequests());
 };
+
+// Otomatik testler tek IP'den yuzlerce istek atiyor ve auth limitine ilk
+// dakikada takiliyor. Sinir yalnizca test ortaminda devre disi birakiliyor.
+const skip = () => env.NODE_ENV === 'test';
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -11,6 +17,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler,
+  skip,
   skipSuccessfulRequests: true,
 });
 
@@ -20,4 +27,5 @@ export const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler,
+  skip,
 });

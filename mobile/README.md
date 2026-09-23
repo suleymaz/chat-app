@@ -1,17 +1,39 @@
-# chat_app
+# Chat App — Mobil İstemci
 
-A new Flutter project.
+Flutter ile geliştirilen mobil uygulama. Kurulum, çalıştırma ve mimari açıklamaları
+projenin kök dizinindeki [README](../README.md) dosyasındadır.
 
-## Getting Started
+## Hızlı başlangıç
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+**Sunucu adresi derleme anında gömülür.** Varsayılan değer Android emülatörü içindir
+(`10.0.2.2:5000`). Gerçek bir cihazda çalıştırırken bilgisayarınızın yerel ağ adresini
+vermeniz gerekir:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter run \
+  --dart-define=API_URL=http://192.168.1.20:5000/api/v1 \
+  --dart-define=SOCKET_URL=http://192.168.1.20:5000
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Testler
+
+```bash
+flutter test
+```
+
+## Klasör düzeni
+
+```
+lib/
+├── core/           yapılandırma, ağ katmanı, güvenli depolama, tema, yardımcılar
+├── data/           modeller, veri kaynakları (API + socket), repository'ler
+└── presentation/   ekranlar, paylaşılan widget'lar, Riverpod provider'ları
+```
+
+Mimari kararların gerekçeleri için:
+[Frontend mimarisi](../README.md#frontend-mimarisi) ve [DECISIONS.md](../DECISIONS.md).

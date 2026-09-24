@@ -5,6 +5,7 @@ import '../../../core/config/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../widgets/baglanti_seridi.dart';
 import '../../widgets/bos_durum.dart';
 import '../../widgets/sohbet_satiri.dart';
 import '../../providers/socket_provider.dart';
@@ -50,54 +51,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      body: sohbetler.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (hata, _) => _hataDurumu(ref),
-        data: (liste) {
-          if (liste.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () => ref.read(sohbetListesiProvider.notifier).tazele(),
-              child: Stack(
-                children: [
-                  ListView(),
-                  BosDurum(
-                    icon: Icons.forum_outlined,
-                    baslik: 'Henüz sohbetin yok',
-                    aciklama: 'Birine mesaj göndererek başlayabilirsin',
-                    aksiyon: FilledButton.icon(
-                      onPressed: () => context.push(Rotalar.search),
-                      icon: const Icon(Icons.person_search, size: 18),
-                      label: const Text('Kullanıcı ara'),
-                    ),
+      body: Column(
+        children: [
+          const BaglantiSeridi(),
+          Expanded(
+              child: sohbetler.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (hata, _) => _hataDurumu(ref),
+            data: (liste) {
+              if (liste.isEmpty) {
+                return RefreshIndicator(
+                  onRefresh: () => ref.read(sohbetListesiProvider.notifier).tazele(),
+                  child: Stack(
+                    children: [
+                      ListView(),
+                      BosDurum(
+                        icon: Icons.forum_outlined,
+                        baslik: 'Henüz sohbetin yok',
+                        aciklama: 'Birine mesaj göndererek başlayabilirsin',
+                        aksiyon: FilledButton.icon(
+                          onPressed: () => context.push(Rotalar.search),
+                          icon: const Icon(Icons.person_search, size: 18),
+                          label: const Text('Kullanıcı ara'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () => ref.read(sohbetListesiProvider.notifier).tazele(),
-            child: ListView.separated(
-              itemCount: liste.length,
-              separatorBuilder: (context, index) => const Divider(indent: 80, height: 1),
-                            itemBuilder: (context, index) {
-                final sohbet = liste[index];
-                final cevrimiciHarita = ref.watch(cevrimiciProvider);
-                final cevrimici =
-                    cevrimiciHarita[sohbet.user.id]?.cevrimici ?? sohbet.user.isOnline;
-
-                return SohbetSatiri(
-                  sohbet: sohbet.copyWith(
-                    user: sohbet.user.copyWith(isOnline: cevrimici),
-                  ),
-                  benimId: benimId,
-                  onTap: () => context.push('${Rotalar.chat}/${sohbet.id}'),
-                  onLongPress: () => _sohbetMenusu(sohbet),
                 );
-              },
-            ),
-          );
-        },
+              }
+
+              return RefreshIndicator(
+                onRefresh: () => ref.read(sohbetListesiProvider.notifier).tazele(),
+                child: ListView.separated(
+                  itemCount: liste.length,
+                  separatorBuilder: (context, index) => const Divider(indent: 80, height: 1),
+                                itemBuilder: (context, index) {
+                    final sohbet = liste[index];
+                    final cevrimiciHarita = ref.watch(cevrimiciProvider);
+                    final cevrimici =
+                        cevrimiciHarita[sohbet.user.id]?.cevrimici ?? sohbet.user.isOnline;
+
+                    return SohbetSatiri(
+                      sohbet: sohbet.copyWith(
+                        user: sohbet.user.copyWith(isOnline: cevrimici),
+                      ),
+                      benimId: benimId,
+                      onTap: () => context.push('${Rotalar.chat}/${sohbet.id}'),
+                      onLongPress: () => _sohbetMenusu(sohbet),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push(Rotalar.search),

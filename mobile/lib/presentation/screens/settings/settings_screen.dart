@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/baglanti_seridi.dart';
 
 // Bildirim onizleme secenekleri - sunucudaki enum ile birebir ayni
 const _onizlemeSecenekleri = {
@@ -77,66 +78,73 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ayarlar')),
-      body: ListView(
+      body: Column(
         children: [
-          _baslik('Bildirimler'),
-          SwitchListTile(
-            value: bildirimAcik,
-            onChanged: _kaydediliyor
-                ? null
-                : (deger) => _ayarGuncelle({'notificationsEnabled': deger}),
-            title: const Text('Bildirimlere izin ver'),
-            subtitle: const Text('Yeni mesaj geldiğinde bildirim gönderilir'),
-            activeThumbColor: AppColors.primary,
-          ),
-          const Divider(height: 1),
+          const BaglantiSeridi(),
+          Expanded(
+              child: ListView(
+            children: [
+              _baslik('Bildirimler'),
+              SwitchListTile(
+                value: bildirimAcik,
+                onChanged: _kaydediliyor
+                    ? null
+                    : (deger) => _ayarGuncelle({'notificationsEnabled': deger}),
+                title: const Text('Bildirimlere izin ver'),
+                subtitle: const Text('Yeni mesaj geldiğinde bildirim gönderilir'),
+                activeThumbColor: AppColors.primary,
+              ),
+              const Divider(height: 1),
 
-          _baslik('Bildirim onizlemesi'),
-          RadioGroup<String>(
-            groupValue: onizleme,
-            onChanged: (deger) {
-              if (deger == null || !bildirimAcik || _kaydediliyor) return;
-              _ayarGuncelle({'notificationPreview': deger});
-            },
-            child: Column(
-              children: [
-                for (final giris in _onizlemeSecenekleri.entries)
-                  RadioListTile<String>(
-                    value: giris.key,
-                    enabled: bildirimAcik && !_kaydediliyor,
-                    title: Text(giris.value.$1),
-                    subtitle: Text(
-                      giris.value.$2,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
-                    ),
-                    activeColor: AppColors.primary,
-                  ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
+              _baslik('Bildirim onizlemesi'),
+              RadioGroup<String>(
+                groupValue: onizleme,
+                onChanged: (deger) {
+                  if (deger == null || !bildirimAcik || _kaydediliyor) return;
+                  _ayarGuncelle({'notificationPreview': deger});
+                },
+                child: Column(
+                  children: [
+                    for (final giris in _onizlemeSecenekleri.entries)
+                      RadioListTile<String>(
+                        value: giris.key,
+                        enabled: bildirimAcik && !_kaydediliyor,
+                        title: Text(giris.value.$1),
+                        subtitle: Text(
+                          giris.value.$2,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                        ),
+                        activeColor: AppColors.primary,
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
 
-          _baslik('Gizlilik'),
-          ListTile(
-            leading: const Icon(Icons.block_outlined, color: AppColors.textSecondary),
-            title: const Text('Engellenen kullanıcılar'),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
-            onTap: () => context.push(Rotalar.blocked),
-          ),
-          const Divider(height: 1),
+              _baslik('Gizlilik'),
+              ListTile(
+                leading: const Icon(Icons.block_outlined, color: AppColors.textSecondary),
+                title: const Text('Engellenen kullanıcılar'),
+                trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                onTap: () => context.push(Rotalar.blocked),
+              ),
+              const Divider(height: 1),
 
-          _baslik('Hesap'),
-          ListTile(
-            leading: const Icon(Icons.person_outline, color: AppColors.textSecondary),
-            title: Text(kullanici?.fullName ?? ''),
-            subtitle: Text('@${kullanici?.username ?? ''}'),
+              _baslik('Hesap'),
+              ListTile(
+                leading: const Icon(Icons.person_outline, color: AppColors.textSecondary),
+                title: Text(kullanici?.fullName ?? ''),
+                subtitle: Text('@${kullanici?.username ?? ''}'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.logout, color: AppColors.error),
+                title: const Text('Çıkış yap', style: TextStyle(color: AppColors.error)),
+                onTap: _cikisOnayi,
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.error),
-            title: const Text('Çıkış yap', style: TextStyle(color: AppColors.error)),
-            onTap: _cikisOnayi,
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );

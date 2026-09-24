@@ -15,6 +15,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/socket_provider.dart';
+import '../../widgets/baglanti_seridi.dart';
 import '../../widgets/gun_ayraci.dart';
 import '../../widgets/kullanici_avatar.dart';
 import '../../widgets/mesaj_balonu.dart';
@@ -755,6 +756,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: _aramaAcik ? _aramaBasligi() : _baslik(yaziyor),
       body: Column(
         children: [
+          const BaglantiSeridi(),
           Expanded(child: _mesajListesi(durum, benimId)),
           // Arama acikken yazma alani gizlenir, ekran aramaya odaklanir
           if (!_aramaAcik) ...[
@@ -926,11 +928,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _mesajListesi(MesajDurum durum, String benimId) {
-    if (durum.yukleniyor) {
+    // Yuklenme ve hata durumlari yalnizca gosterilecek mesaj yokken ekrani
+    // kapliyor. Baglanti kopunca okunmus gecmisin yerini "tekrar dene"
+    // ekraninin almasi, elde duran veriyi bos yere gizliyordu; kopuklugu
+    // zaten ustteki baglanti seridi anlatiyor.
+    if (durum.yukleniyor && durum.mesajlar.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (durum.hata != null) {
+    if (durum.hata != null && durum.mesajlar.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

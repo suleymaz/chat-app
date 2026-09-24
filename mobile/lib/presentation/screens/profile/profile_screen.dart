@@ -10,6 +10,7 @@ import '../../../core/utils/medya_secici.dart';
 import '../../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/baglanti_seridi.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/hata_kutusu.dart';
 import '../../widgets/kullanici_avatar.dart';
@@ -263,136 +264,143 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       // Ayarlara alt menuden gecildigi icin buradaki kisayol kaldirildi
       appBar: AppBar(title: const Text('Profil')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _avatarBolumu(kullanici?.avatarUrl, kullanici?.basHarfler ?? '?'),
-                  const SizedBox(height: 8),
-                  Text(
-                    '@${kullanici?.username ?? ''}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 28),
-
-                  if (_genelHata != null) ...[
-                    HataKutusu(mesaj: _genelHata!),
-                    const SizedBox(height: 16),
-                  ],
-
-                  AppTextField(
-                    controller: _adController,
-                    label: 'Ad soyad',
-                    icon: Icons.badge_outlined,
-                    aktif: !_kaydediliyor,
-                    maksUzunluk: 100,
-                    hataMetni: _alanHatalari?['fullName'],
-                    dogrula: (deger) {
-                      final metin = deger?.trim() ?? '';
-                      if (metin.length < 2) return 'Ad soyad en az 2 karakter olmalı';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  AppTextField(
-                    controller: _kullaniciAdiController,
-                    label: 'Kullanıcı adı',
-                    icon: Icons.alternate_email,
-                    aktif: !_kaydediliyor,
-                    maksUzunluk: 30,
-                    hataMetni: _alanHatalari?['username'],
-                    dogrula: (deger) {
-                      final metin = deger?.trim() ?? '';
-                      if (metin.length < 3) {
-                        return 'Kullanıcı adı en az 3 karakter olmalı';
-                      }
-                      if (!RegExp(r'^[a-z0-9_]+$').hasMatch(metin)) {
-                        return 'Sadece küçük harf, rakam ve alt çizgi kullanılabilir';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  AppTextField(
-                    controller: _epostaController,
-                    label: 'E-posta',
-                    icon: Icons.mail_outline,
-                    aktif: !_kaydediliyor,
-                    klavyeTipi: TextInputType.emailAddress,
-                    hataMetni: _alanHatalari?['email'],
-                    dogrula: (deger) {
-                      final metin = deger?.trim() ?? '';
-                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(metin)) {
-                        return 'Geçerli bir e-posta adresi girin';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  AppTextField(
-                    controller: _telefonController,
-                    label: 'Telefon',
-                    hint: '05551234567',
-                    icon: Icons.phone_outlined,
-                    aktif: !_kaydediliyor,
-                    klavyeTipi: TextInputType.phone,
-                    maksUzunluk: 11,
-                    hataMetni: _alanHatalari?['phone'],
-                    dogrula: (deger) {
-                      final metin = deger?.trim() ?? '';
-                      if (!RegExp(r'^0[0-9]{10}$').hasMatch(metin)) {
-                        return 'Telefon 05XXXXXXXXX biçiminde olmalı';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  AppTextField(
-                    controller: _bioController,
-                    label: 'Hakkında',
-                    hint: 'Kendinden kısaca bahset',
-                    icon: Icons.notes_outlined,
-                    aktif: !_kaydediliyor,
-                    maksUzunluk: 160,
-                    hataMetni: _alanHatalari?['bio'],
-                  ),
-                  const SizedBox(height: 24),
-
-                  AppButton(
-                    metin: 'Kaydet',
-                    icon: Icons.check,
-                    yukleniyor: _kaydediliyor,
-                    onPressed: _kaydet,
-                  ),
-                  const SizedBox(height: 12),
-
-                  OutlinedButton.icon(
-                    onPressed: () => context.push(Rotalar.changePassword),
-                    icon: const Icon(Icons.lock_outline, size: 18),
-                    label: const Text('Şifre değiştir'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+      body: Column(
+        children: [
+          const BaglantiSeridi(),
+          Expanded(
+              child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _avatarBolumu(kullanici?.avatarUrl, kullanici?.basHarfler ?? '?'),
+                      const SizedBox(height: 8),
+                      Text(
+                        '@${kullanici?.username ?? ''}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                       ),
-                    ),
+                      const SizedBox(height: 28),
+
+                      if (_genelHata != null) ...[
+                        HataKutusu(mesaj: _genelHata!),
+                        const SizedBox(height: 16),
+                      ],
+
+                      AppTextField(
+                        controller: _adController,
+                        label: 'Ad soyad',
+                        icon: Icons.badge_outlined,
+                        aktif: !_kaydediliyor,
+                        maksUzunluk: 100,
+                        hataMetni: _alanHatalari?['fullName'],
+                        dogrula: (deger) {
+                          final metin = deger?.trim() ?? '';
+                          if (metin.length < 2) return 'Ad soyad en az 2 karakter olmalı';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        controller: _kullaniciAdiController,
+                        label: 'Kullanıcı adı',
+                        icon: Icons.alternate_email,
+                        aktif: !_kaydediliyor,
+                        maksUzunluk: 30,
+                        hataMetni: _alanHatalari?['username'],
+                        dogrula: (deger) {
+                          final metin = deger?.trim() ?? '';
+                          if (metin.length < 3) {
+                            return 'Kullanıcı adı en az 3 karakter olmalı';
+                          }
+                          if (!RegExp(r'^[a-z0-9_]+$').hasMatch(metin)) {
+                            return 'Sadece küçük harf, rakam ve alt çizgi kullanılabilir';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        controller: _epostaController,
+                        label: 'E-posta',
+                        icon: Icons.mail_outline,
+                        aktif: !_kaydediliyor,
+                        klavyeTipi: TextInputType.emailAddress,
+                        hataMetni: _alanHatalari?['email'],
+                        dogrula: (deger) {
+                          final metin = deger?.trim() ?? '';
+                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(metin)) {
+                            return 'Geçerli bir e-posta adresi girin';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        controller: _telefonController,
+                        label: 'Telefon',
+                        hint: '05551234567',
+                        icon: Icons.phone_outlined,
+                        aktif: !_kaydediliyor,
+                        klavyeTipi: TextInputType.phone,
+                        maksUzunluk: 11,
+                        hataMetni: _alanHatalari?['phone'],
+                        dogrula: (deger) {
+                          final metin = deger?.trim() ?? '';
+                          if (!RegExp(r'^0[0-9]{10}$').hasMatch(metin)) {
+                            return 'Telefon 05XXXXXXXXX biçiminde olmalı';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        controller: _bioController,
+                        label: 'Hakkında',
+                        hint: 'Kendinden kısaca bahset',
+                        icon: Icons.notes_outlined,
+                        aktif: !_kaydediliyor,
+                        maksUzunluk: 160,
+                        hataMetni: _alanHatalari?['bio'],
+                      ),
+                      const SizedBox(height: 24),
+
+                      AppButton(
+                        metin: 'Kaydet',
+                        icon: Icons.check,
+                        yukleniyor: _kaydediliyor,
+                        onPressed: _kaydet,
+                      ),
+                      const SizedBox(height: 12),
+
+                      OutlinedButton.icon(
+                        onPressed: () => context.push(Rotalar.changePassword),
+                        icon: const Icon(Icons.lock_outline, size: 18),
+                        label: const Text('Şifre değiştir'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          ),
+        ],
       ),
     );
   }

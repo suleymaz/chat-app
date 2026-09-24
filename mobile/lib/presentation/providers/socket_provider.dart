@@ -90,6 +90,8 @@ class SocketKoordinator {
   final Ref _ref;
   final List<StreamSubscription> _abonelikler = [];
 
+  bool? _oncekiBagli;
+
   SocketKoordinator(this._ref);
 
   void basla() {
@@ -101,6 +103,19 @@ class SocketKoordinator {
     _abonelikler.add(servis.mesajSilindi.listen(_mesajSilindi));
     _abonelikler.add(servis.yaziyor.listen(_yaziyorGeldi));
     _abonelikler.add(servis.durum.listen(_durumGeldi));
+    _abonelikler.add(servis.baglantiDurumu.listen(_baglantiDegisti));
+  }
+
+  /// Baglanti koptugu sure boyunca mesajlar socket'ten gelmiyor.
+  ///
+  /// Sohbet ekrani geri baglaninca kendi listesini tazeliyor ama sohbet listesi
+  /// tazelenmiyordu: kullanici listedeyken ag kopup geri geldiginde aradaki
+  /// mesajlar ancak elle yenilenince goruluyordu.
+  void _baglantiDegisti(bool bagli) {
+    final oncekiKopuk = _oncekiBagli == false;
+    _oncekiBagli = bagli;
+
+    if (bagli && oncekiKopuk) _listeleriTazele();
   }
 
   /// Sohbet ve arsiv listelerini birlikte tazeler.

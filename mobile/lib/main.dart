@@ -83,6 +83,12 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
       if (!girisYapildi) return;
 
       final servis = ref.read(socketServiceProvider);
+
+      // Once gercek durumla karsilastir: bayrak yanlissa hem serit yanlis
+      // bilgi gosteriyor hem de saglam socket bosuna kapatilip yeniden
+      // kuruluyordu.
+      servis.durumuDogrula();
+
       if (!servis.bagli) {
         servis.baglan();
       }
@@ -167,7 +173,7 @@ class _ChatAppState extends ConsumerState<ChatApp> with WidgetsBindingObserver {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Chat App',
+      title: 'Lafla',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: router,

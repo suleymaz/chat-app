@@ -37,7 +37,13 @@ export const initSocket = (httpServer) => {
       origin: corsOrigin(),
       methods: ["GET", "POST"],
     },
-    pingTimeout: 60000,
+    // Telefonun agi kesildiginde TCP baglantisi acik gorunur, sunucu kopmayi
+    // ancak pong gelmeyince anlar. Onceki degerlerle (25 sn aralik + 60 sn
+    // bekleme) bu 87 saniye suruyordu ve o sure boyunca kullanici cevrimici
+    // sayildigi icin mesajlar olu sokete gidiyor, FCM bildirimi hic
+    // gonderilmiyordu. 20+20 ile kopma ~40 saniyede fark ediliyor.
+    pingInterval: 20000,
+    pingTimeout: 20000,
     transports: ["websocket"],
   });
 

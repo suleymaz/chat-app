@@ -86,9 +86,42 @@ class SocketService {
   Stream<MesajSilindiOlayi> get mesajSilindi => _mesajSilindi.stream;
   Stream<YaziyorOlayi> get yaziyor => _yaziyor.stream;
   Stream<DurumOlayi> get durum => _durum.stream;
-  Stream<bool> get baglantiDurumu => _baglantiDurumu.stream;
+
+  /// Baglanti durumu. Yeni dinleyiciye once mevcut durum veriliyor.
+  ///
+  /// Yayin akisi gecmisi saklamadigi icin sonradan dinlemeye baslayan bir ekran
+  /// son olayi kaciriyor ve baglanti varken bile "baglanti yok" gosterebiliyordu.
+  Stream<bool> get baglantiDurumu async* {
+    yield _bagliMi;
+    yield* _baglantiDurumu.stream;
+  }
 
   bool get bagli => _bagliMi;
+
+  // Durum tek yerden degistiriliyor: bayrak ile akisin ayrismasi, seridin
+  // yanlis bilgi gostermesine ve calisan socket'in bosuna kapatilmasina
+  // yol aciyordu.
+  void _durumBildir(bool yeniDurum) {
+    if (_bagliMi == yeniDurum) return;
+
+    _bagliMi = yeniDurum;
+    _baglantiDurumu.add(yeniDurum);
+  }
+
+  /// Kutuphanenin gercek durumunu bizim bayrakla karsilastirir, ayrisma varsa
+  /// duzeltir.
+  ///
+  /// Durum yalnizca olaylardan izleniyordu. Ag kesilip geri geldiginde
+  /// olaylardan biri kacirilabiliyor ve bayrak gercekle ayrisiyordu: socket
+  /// calisirken serit "baglanti yok" diyor, ya da tersi durumda saglam socket
+  /// kapatilip yeniden kuruluyordu. Her gereksiz kapatma sunucuda bir dakikadan
+  /// uzun yasayan olu bir kayit biraktigi icin bildirimler de kesiliyordu.
+  void durumuDogrula() {
+    // Baglanti kurulurken connected henuz false; bu ara durumu bildirmiyoruz
+    if (_baglaniyor) return;
+
+    _durumBildir(_socket?.connected ?? false);
+  }
 
   // Token yenileme icin disaridan verilen fonksiyon
   Future<bool> Function()? tokenYenile;
@@ -168,20 +201,17 @@ class SocketService {
     if (socket == null) return;
 
     socket.onConnect((_) {
-      _bagliMi = true;
       _yenilemeDenendi = false;
       _denemeSayisi = 0;
-      _baglantiDurumu.add(true);
+      _durumBildir(true);
     });
 
     socket.onDisconnect((_) {
-      _bagliMi = false;
-      _baglantiDurumu.add(false);
+      _durumBildir(false);
     });
 
     socket.onConnectError((hata) async {
-      _bagliMi = false;
-      _baglantiDurumu.add(false);
+      _durumBildir(false);
 
       // Token suresi dolmus olabilir - yenileyip tekrar dene.
       // Sunucu erisilemezse her hatada yenilemeye calismanin anlami yok,
@@ -200,7 +230,7 @@ class SocketService {
     // Sunucu yeniden baslatildiginda otomatik yeniden baglanma tukenebiliyor,
     // o durumda sifirdan baglaniyoruz. Bekleme her denemede uzar.
     socket.onReconnectFailed((_) async {
-      _bagliMi = false;
+      _durumBildir(false);
       _denemeSayisi++;
 
       final saniye = (3 * _denemeSayisi).clamp(3, 60);
@@ -209,8 +239,7 @@ class SocketService {
     });
 
     socket.onReconnectError((_) {
-      _bagliMi = false;
-      _baglantiDurumu.add(false);
+      _durumBildir(false);
     });
 
     socket.on('message:new', (veri) {
@@ -306,13 +335,11 @@ class SocketService {
 
   // Cikis yapildiginda cagriliyor - yeniden baglanma denemeleri de durur
   void kopar() {
-    _bagliMi = false;
     _yenilemeDenendi = false;
     _denemeSayisi = 0;
 
     _oncekiniKapat();
-
-    _baglantiDurumu.add(false);
+    _durumBildir(false);
   }
 
   void temizle() {

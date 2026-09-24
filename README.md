@@ -1,4 +1,4 @@
-# Chat App
+# Lafla
 
 WhatsApp benzeri, birebir mesajlaşma uygulaması. Flutter mobil istemci ve
 Node.js/Express backend'den oluşur; mesajlar PostgreSQL'de kalıcı olarak saklanır,
@@ -71,6 +71,12 @@ uçtan uca bir sistem olarak kurgulanmıştır.
 - Firebase Cloud Messaging ile uygulama arka plandayken ve kapalıyken bildirim
 - Bildirim önizleme ayarı: ad ve mesaj / yalnızca ad / içerik gösterme
 - Sessize alınan sohbetler için bildirim gönderilmez
+
+**Durum yönetimi**
+
+- Yükleniyor, hata ve boş liste durumları her ekranda ayrı ayrı ele alınır
+- Sunucu bağlantısı koptuğunda ekranın üstünde uyarı şeridi belirir
+- Gönderilemeyen mesaj hata durumuyla gösterilir ve yeniden denenebilir
 
 ## Kullanılan teknolojiler
 
@@ -680,7 +686,8 @@ flutter test
 ```
 
 Kapsam: tarih biçimlendirme, medya adresi birleştirme, mesaj durumu mantığı, model
-yardımcıları, mesaj balonu ve sohbet satırı widget'ları. **44 test.**
+yardımcıları, mesaj balonu ve sohbet satırı widget'ları, bağlantı kopukluğunda uyarı
+şeridinin davranışı. **49 test.**
 
 ## Karşılaşılan problemler ve çözümleri
 

@@ -1,4 +1,4 @@
-# Chat App — Mobil İstemci
+# Lafla — Mobil İstemci
 
 Flutter ile geliştirilen mobil uygulama. Kurulum, çalıştırma ve mimari açıklamaları
 projenin kök dizinindeki [README](../README.md) dosyasındadır.

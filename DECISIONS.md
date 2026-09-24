@@ -668,3 +668,73 @@ bir sohbete mesaj gelince liste eski mesajı göstermeye devam ediyor, sohbeti a
 okunmamış rozeti kalıyordu. Dört noktada arşiv listesi de tazeleniyor artık; arşiv ekranı hiç
 açılmadıysa provider'ı yaratıp boşuna istek atmamak için varlık kontrolü koydum. Sunucu
 tarafını ayrıca test ettim, orada sorun yoktu; veri hep doğruydu, uygulama sormuyordu.
+
+## Gün 16 — Testler ve Dokümantasyon
+
+Test koşucusu olarak Node'un yerleşik `node --test`'ini seçtim. Proje saf ESM ve Jest'i ESM'le
+çalıştırmak ek bayrak ve yapılandırma istiyor; yerleşik koşucu sıfır yapılandırmayla çalıştı.
+Testler sahte katman kullanmıyor: gerçek Express uygulamasını gerçek PostgreSQL'e bağlayıp
+üzerine HTTP isteği atıyor.
+
+Test veritabanı için ayrı bir .env.test tutmak yerine .env'deki bağlantıyı okuyup yalnızca
+veritabanı adını değiştiriyorum. Böylece depoya şifre girmiyor, projeyi indiren kişi ikinci bir
+dosya doldurmuyor ve testin geliştirme verisine dokunması yapısal olarak imkânsız oluyor. Bu
+değişimin her modülden önce yapılması gerektiği için --import ön yüklemesi kullandım. İki tuzak
+çıktı: Node 24'te --test klasör yolu kabul etmiyor, glob deseni gerekiyor; dosyalar aynı
+veritabanını paylaştığı için de eşzamanlılık bire indirilmeli. Test ortamında ayrıca istek sınırı
+atlanıyor ve winston susturuluyor, yoksa morgan her isteği basıp çıktıyı okunmaz hale getiriyor.
+
+Testleri yazarken gerçek bir hata çıktı: socket bağlantı işleyicisi olay dinleyicilerini
+iki await çağrısından sonra kaydediyordu. O aralıkta gelen conversation:join sessizce düşüyor,
+disconnect ise hiç yakalanmıyordu; hızlı bağlanıp kopan kullanıcı kalıcı çevrimiçi kalıyordu.
+Açılışta çevrimiçi durumu sıfırlayan kod bunu örtüyormuş, çözmüyormuş. Elle denemede yakalamak
+için bağlanıp çok hızlı kopmak gerekiyordu, test kendiliğinden buldu. Dinleyiciler artık asenkron
+işten önce bağlanıyor. Toplam 63 backend, 44 mobil test.
+
+Dokümantasyonda README'nin istenen on altı başlığını doldurdum, API'yi ayrı bir dosyaya yazdım ve
+ER diyagramını Mermaid olarak README'ye gömdüm; GitHub doğrudan çiziyor, ayrı resim dosyası
+taşımak gerekmiyor. Yazarken iddiaları hafızadan değil koddan doğruladım ve beş yerde kendi
+taslağımı düzeltmem gerekti: avatar yükleme tam profil dönüyormuş, sohbet açma ucu sohbet yoksa
+id alanını boş veriyormuş, avatar silme ucu hiç belgelenmemiş. Hata kodu listem de eksikti; ilk
+taramam tek tırnaklıları yakalamış, çift tırnaklıları kaçırmıştı, liste 22'den 38'e çıktı.
+
+## Gün 17 — Bağlantı Durumu ve Uygulama Kimliği
+
+Bağlantı kopunca ekranın üstünde uyarı şeridi beliriyor. Şerit iki saniye gecikmeli çıkıyor:
+ağ değişiminde socket bir saniyeliğine kopuyor ve şerit anında görünseydi ekran boyuna oynardı.
+Bağlantı geri gelince beklemeden kalkıyor. Durum henüz bilinmiyorken de gösterilmiyor, yoksa
+uygulama her açılışta kırmızı bir uyarıyla karşılardı. Şeridi önce sekme kabuğuna koymuştum ama
+SafeArea gizliyken bile durum çubuğu kadar boşluk bırakıyor, göründüğünde de alttaki AppBar kendi
+boşluğunu ekleyip çift pay oluşturuyordu; her ekranın gövdesine, başlığın hemen altına taşıdım.
+
+Şeridi takınca asıl hata görünür oldu: socket durumu yalnızca olaylardan izleniyordu. Ağ kesilip
+döndüğünde olaylardan biri kaçırılınca bayrak gerçekle ayrışıyor ve iki yönlü bozuluyordu. Bayrak
+yanlışlıkla kopuk sanılırsa şerit çalışan bağlantıda uyarı gösteriyor, tersi durumda ise sağlam
+socket boşuna kapatılıp yeniden kuruluyordu. Durum artık tek bir yerden değişiyor, akış yeni
+dinleyiciye önce mevcut değeri veriyor ve otuz saniyelik kontrol kütüphanenin gerçek durumuyla
+karşılaştırıp bayrağı düzeltiyor.
+
+Bildirim sorununu ölçerek buldum. Ping'lere yanıt vermeyen ama bağlantıyı açık tutan bir istemci
+yazdım; telefonun internetinin kesilmesi tam olarak budur. Sunucu ölü istemciyi 87 saniye boyunca
+çevrimiçi sayıyordu, çünkü ping aralığı 25 ve bekleme 60 saniyeydi. O süre boyunca mesaj ölü
+sokete gidiyor ve alıcı çevrimiçi sayıldığı için FCM bildirimi hiç gönderilmiyordu. 20+20'ye
+indirdim, ölçüm 40 saniyeye düştü. Sıfırlanamaz, ping tabanlı tespitte bir pencere hep kalıyor.
+Ayrıca bağlantı dönünce sohbet listesi tazelenmiyordu; sohbet ekranı kendi listesini zaten
+tazeliyordu ama listede duruyorken ağ kopup gelirse aradaki mesajlar elle yenilenene kadar
+görünmüyordu.
+
+Bağlantı kopunca yüklenmiş veri de kayboluyordu. Sohbet ekranı hata durumunu mesajlardan önce
+kontrol ettiği için okunmuş geçmişin yerini "tekrar dene" ekranı alıyordu; sohbet listesi ise
+yeniden yüklerken önce boşalıp hatada elindeki veriyi tamamen atıyordu. İkisi de artık boş ekranı
+yalnızca gösterilecek veri yokken gösteriyor. Sohbetten çıkınca mesaj durumu hemen siliniyordu,
+beş dakika bellekte tutuyorum; süresiz tutmak bütün sohbetleri biriktirirdi. Uygulama kapatılıp
+çevrimdışı açılırsa hâlâ mesaj görünmüyor, gerçek çevrimdışı destek yerel veritabanı ister.
+
+Uygulamanın adını Lafla koydum, iki konuşma balonundan bir simge ürettim ve açılış ekranını aynı
+işarete çevirdim.
+
+Günün sonunda bir saati kodda olmayan bir hatayı aramakla geçirdim. Cihazda şerit sürekli
+"bağlantı yok" diyordu ama HTTP istekleri çalışıyordu; APK'nın sabit havuzunu okuyunca çıktı,
+derleme komutunda SOCKET_URL'e fazladan bir hane yazılmıştı. API_URL ve SOCKET_URL'in ayrı iki
+ayar olması bu hatayı davet ediyor, socket adresi verilmediğinde API adresinden türetmek daha
+güvenli olur.

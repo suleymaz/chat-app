@@ -22,13 +22,20 @@ class SohbetListesiNotifier extends StateNotifier<AsyncValue<List<ConversationMo
   }
 
   Future<void> yukle() async {
-    state = const AsyncValue.loading();
+    // Elde liste varken loading'e dusmek ekrani bosaltiyor; bos ekran
+    // yalnizca hic veri yokken gosteriliyor.
+    if (!state.hasValue) state = const AsyncValue.loading();
 
     try {
       final sohbetler = await _repo.sohbetleriGetir(arsivlenmis: arsivlenmis);
+      if (!mounted) return;
       state = AsyncValue.data(sohbetler);
     } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
+      if (!mounted) return;
+
+      // Daha once yuklenmis liste korunur: baglanti kopukken sohbetleri
+      // silip hata ekrani gostermek yerine eldeki veri gorunmeye devam eder.
+      if (!state.hasValue) state = AsyncValue.error(e, stack);
     }
   }
 

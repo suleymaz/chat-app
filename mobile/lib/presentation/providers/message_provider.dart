@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/message_model.dart';
@@ -469,15 +471,34 @@ class MesajNotifier extends StateNotifier<MesajDurum> {
   }
 }
 
+// Sohbetten cikildiktan sonra durumun bellekte tutuldugu sure. Sinirsiz
+// tutmak butun sohbetleri bellekte biriktirirdi; hic tutmamak ise sohbete
+// geri donuldugunde mesajlari sifirdan cektiriyordu. Baglanti yokken bu,
+// okunmus gecmisin yerini "Mesajlar yuklenemedi" ekraninin almasi demekti.
+const _durumSaklamaSuresi = Duration(minutes: 5);
+
 // Her sohbet icin ayri notifier - family kullaniyoruz
 final mesajProvider =
     StateNotifierProvider.autoDispose.family<MesajNotifier, MesajDurum, MesajParam>(
-  (ref, param) => MesajNotifier(
-    ref.watch(chatRepositoryProvider),
-    conversationId: param.conversationId,
-    karsiTarafId: param.karsiTarafId,
-    benimId: param.benimId,
-  ),
+  (ref, param) {
+    final baglanti = ref.keepAlive();
+    Timer? zamanlayici;
+
+    ref.onCancel(() {
+      zamanlayici = Timer(_durumSaklamaSuresi, baglanti.close);
+    });
+
+    // Sohbete sure dolmadan geri donuldu: durum korunuyor
+    ref.onResume(() => zamanlayici?.cancel());
+    ref.onDispose(() => zamanlayici?.cancel());
+
+    return MesajNotifier(
+      ref.watch(chatRepositoryProvider),
+      conversationId: param.conversationId,
+      karsiTarafId: param.karsiTarafId,
+      benimId: param.benimId,
+    );
+  },
 );
 
 class MesajParam {

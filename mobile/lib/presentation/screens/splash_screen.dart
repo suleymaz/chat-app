@@ -12,22 +12,23 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Uygulama simgesinin on katmani: telefondaki simgeyle ayni isaret
             Container(
-              width: 96,
-              height: 96,
+              width: 112,
+              height: 112,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
               ),
-              child: const Icon(
-                Icons.forum_outlined,
-                size: 52,
-                color: Colors.white,
+              padding: const EdgeInsets.all(14),
+              child: Image.asset(
+                'assets/icon/icon_foreground.png',
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 24),
             const Text(
-              'Mesajlasma',
+              'Lafla',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,

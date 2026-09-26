@@ -72,6 +72,15 @@ class SocketService {
   // Basarisiz yeniden baglanma sayisi - bekleme suresi buna gore artar
   int _denemeSayisi = 0;
 
+  // Baglanti isteniyor mu. Gecikmeli yeniden denemeler bu bayraga bakiyor:
+  // kopar() cagrildiktan sonra uyanan bir deneme socket'i geri actiginda,
+  // uygulama arka plandayken bagli gorunuyor ve sunucu FCM gondermiyordu.
+  bool _istendi = false;
+
+  // Son baglanti denemesinin ani. El sikisma surerken socket.connected henuz
+  // false donuyor; durum dogrulamasi bu pencerede karar vermemeli.
+  DateTime? _sonDenemeAni;
+
   final _yeniMesaj = StreamController<YeniMesajOlayi>.broadcast();
   final _iletildi = StreamController<IletildiOlayi>.broadcast();
   final _okundu = StreamController<OkunduOlayi>.broadcast();
@@ -120,6 +129,11 @@ class SocketService {
     // Baglanti kurulurken connected henuz false; bu ara durumu bildirmiyoruz
     if (_baglaniyor) return;
 
+    final deneme = _sonDenemeAni;
+    if (deneme != null && DateTime.now().difference(deneme) < const Duration(seconds: 10)) {
+      return;
+    }
+
     _durumBildir(_socket?.connected ?? false);
   }
 
@@ -130,6 +144,7 @@ class SocketService {
     if (_baglaniyor) return;
     if (_bagliMi) return;
 
+    _istendi = true;
     _baglaniyor = true;
 
     try {
@@ -169,6 +184,7 @@ class SocketService {
       _socket!.auth = {'token': token};
 
       _dinleyicileriKur();
+      _sonDenemeAni = DateTime.now();
       _socket!.connect();
     } finally {
       _baglaniyor = false;
@@ -195,6 +211,14 @@ class SocketService {
       return true;
     }
   }
+
+  /// Gecikmeli bir yeniden denemenin hala anlamli olup olmadigini soyler.
+  ///
+  /// Bekleme suresi dolana kadar iki sey degismis olabilir: cikis yapilmis ya
+  /// da uygulama arka plana gecip kopar() cagrilmis olabilir (o zaman socket'i
+  /// geri acmak bildirimleri susturur), ya da baska bir yol zaten yeni bir
+  /// socket kurmus olabilir (o zaman calisan baglantiyi bosuna kapatirdik).
+  bool _denemeGecerli(io.Socket socket) => _istendi && identical(_socket, socket);
 
   void _dinleyicileriKur() {
     final socket = _socket;
@@ -224,6 +248,8 @@ class SocketService {
       if (!yenilendi) return;
 
       await Future.delayed(const Duration(milliseconds: 300));
+      if (!_denemeGecerli(socket)) return;
+
       await baglan();
     });
 
@@ -235,6 +261,8 @@ class SocketService {
 
       final saniye = (3 * _denemeSayisi).clamp(3, 60);
       await Future.delayed(Duration(seconds: saniye));
+      if (!_denemeGecerli(socket)) return;
+
       await baglan();
     });
 
@@ -333,17 +361,21 @@ class SocketService {
     socket.dispose();
   }
 
-  // Cikis yapildiginda cagriliyor - yeniden baglanma denemeleri de durur
+  // Cikis yapildiginda ve uygulama arka plana gecince cagriliyor.
+  // _istendi kapatildigi icin bekleyen yeniden denemeler de durur.
   void kopar() {
+    _istendi = false;
     _yenilemeDenendi = false;
     _denemeSayisi = 0;
+    _sonDenemeAni = null;
 
     _oncekiniKapat();
     _durumBildir(false);
   }
 
   void temizle() {
-    _bagliMi = false;
+    _istendi = false;
     _oncekiniKapat();
+    _durumBildir(false);
   }
 }

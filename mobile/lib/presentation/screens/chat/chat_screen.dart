@@ -10,6 +10,7 @@ import '../../../core/utils/medya_secici.dart';
 import '../../../core/utils/tarih_formatla.dart';
 import '../../../data/datasources/socket_service.dart';
 import '../../../data/models/message_model.dart';
+import '../../../data/models/conversation_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
@@ -159,7 +160,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  /// Basliktaki kisiyi sohbet listesinden okur.
+  ///
+  /// Karsi tarafin adi ve avatari yalnizca sunucudan cekiliyordu. Baglanti
+  /// yokken istek dusuyor ve mesajlar onbellekten gelse bile baslik "Sohbet"
+  /// ve "?" olarak kaliyordu. Ayni bilgi sohbet listesinde zaten duruyor.
+  UserModel? _listedekiKarsiTaraf() {
+    final listeler = <List<ConversationModel>?>[
+      ref.read(sohbetListesiProvider).valueOrNull,
+      if (ref.exists(arsivListesiProvider)) ref.read(arsivListesiProvider).valueOrNull,
+    ];
+
+    for (final liste in listeler) {
+      for (final sohbet in liste ?? const <ConversationModel>[]) {
+        if (sohbet.id == widget.conversationId) return sohbet.user;
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _karsiTarafiYukle() async {
+    // Listede varsa baslik hemen doluyor; cevrimdisiyken tek kaynak bu.
+    // Sunucudan gelen yanit sonra uzerine yaziyor.
+    final listeden = _yeniSohbet ? null : _listedekiKarsiTaraf();
+
+    if (listeden != null && mounted) {
+      setState(() {
+        _karsiTaraf = listeden;
+        _karsiTarafYukleniyor = false;
+      });
+    }
+
     try {
       if (_yeniSohbet && widget.userId != null) {
         final kullanici =

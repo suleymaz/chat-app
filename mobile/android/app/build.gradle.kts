@@ -5,7 +5,15 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
+}
+
+// Firebase eklentisi yalnizca yapilandirma dosyasi varken uygulaniyor.
+// plugins blogunda kosulsuz durdugunda, google-services.json depoya
+// gonderilmedigi icin projeyi klonlayan herkeste derleme "File
+// google-services.json is missing" hatasiyla basliyordu. Dart tarafi zaten
+// Firebase baslatilamazsa bildirimleri sessizce devre disi birakiyor.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 // Imza bilgileri depoya gonderilmeyen key.properties dosyasindan okunuyor.

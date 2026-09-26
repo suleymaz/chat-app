@@ -1,0 +1,16 @@
+# Release imzalama bilgileri. Bu dosyayi key.properties olarak kopyalayip
+# kendi degerlerinizi yazin; key.properties depoya gonderilmez.
+#
+# Keystore uretmek icin (keytool, Android Studio ile birlikte gelen JDK'da):
+#
+#   keytool -genkeypair -v -keystore ~/lafla-release.jks -storetype PKCS12 \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias lafla
+#
+# key.properties yoksa release derlemesi debug anahtariyla imzalanir, yani
+# projeyi klonlayan biri anahtar olmadan da derleyebilir.
+
+storePassword=keystore_sifresi
+keyPassword=anahtar_sifresi
+keyAlias=lafla
+# Windows'ta da duz egik cizgi kullanin: C:/Users/kullanici/lafla-release.jks
+storeFile=/mutlak/yol/lafla-release.jks

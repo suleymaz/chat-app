@@ -38,6 +38,11 @@ mobile/ios/.symlinks/
 **/GoogleService-Info.plist
 **/serviceAccountKey.json
 
+# Android imzalama - anahtar dosyasi ve sifreleri depoya girmemeli
+*.jks
+*.keystore
+**/key.properties
+
 # IDE
 .vscode/
 .idea/

@@ -8,6 +8,7 @@ class SecureStorage {
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
   static const _userIdKey = 'user_id';
+  static const _sunucuAdresiKey = 'sunucu_adresi';
 
   static Future<void> tokenKaydet({
     required String accessToken,
@@ -26,5 +27,19 @@ class SecureStorage {
 
   static Future<String?> userIdAl() => _storage.read(key: _userIdKey);
 
-  static Future<void> temizle() => _storage.deleteAll();
+  // Sunucu adresi kullaniciya ait bir sir degil, cihaza ait bir ayar.
+  // Cikista silinmiyor; aksi halde her cikistan sonra yeniden girilmesi
+  // gerekirdi.
+  static Future<void> sunucuAdresiKaydet(String adres) =>
+      _storage.write(key: _sunucuAdresiKey, value: adres);
+
+  static Future<String?> sunucuAdresiAl() => _storage.read(key: _sunucuAdresiKey);
+
+  /// Oturum bilgilerini siler. deleteAll() kullanilmiyor: sunucu adresi
+  /// oturumdan bagimsiz bir cihaz ayari ve cikista kaybolmamali.
+  static Future<void> temizle() async {
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _userIdKey);
+  }
 }

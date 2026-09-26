@@ -531,35 +531,65 @@ Kontrol: `curl http://localhost:5000/health`
 
 ### Mobil
 
-**Sunucu adresi derleme anında gömülür.** Varsayılan değer Android emülatörü içindir
-(`10.0.2.2`). Gerçek bir cihazda çalıştırırken bilgisayarınızın yerel ağ adresini
-vermeniz gerekir, aksi hâlde uygulama "internet bağlantısı yok" hatası verir.
-
-```bash
-cd mobile
-
-# Android emülatöründe
-flutter run
-
-# Gerçek cihazda - kendi yerel IP adresinizi yazın
-flutter run \
-  --dart-define=API_URL=http://192.168.1.20:5000/api/v1 \
-  --dart-define=SOCKET_URL=http://192.168.1.20:5000
-```
+**Sunucu adresi uygulama içinden ayarlanır.** Giriş ekranının altındaki "Sunucu"
+düğmesine dokunup sunucunun çalıştığı bilgisayarın yerel ağ adresini yazın; adres
+cihazda saklanır. Giriş yaptıktan sonra Ayarlar → Sunucu adresi bölümünden de
+değiştirilebilir.
 
 Yerel IP adresinizi öğrenmek için: Windows'ta `ipconfig`, macOS/Linux'ta
 `ifconfig | grep inet`.
 
+```bash
+cd mobile
+flutter run
+```
+
+Varsayılan adres Android emülatörü içindir (`10.0.2.2:5000`). İsterseniz varsayılanı
+derleme anında değiştirebilirsiniz; bu yalnızca uygulama içinden henüz bir adres
+ayarlanmamışsa geçerlidir:
+
+```bash
+flutter run --dart-define=API_URL=http://192.168.1.20:5000/api/v1
+```
+
+Socket adresi API adresinden türetilir, ayrıca verilmesi gerekmez.
+
 APK üretmek için:
 
 ```bash
-flutter build apk --release \
-  --dart-define=API_URL=http://192.168.1.20:5000/api/v1 \
-  --dart-define=SOCKET_URL=http://192.168.1.20:5000
+flutter build apk --release
 ```
 
 Cihazın ve sunucunun aynı ağda olması, ayrıca güvenlik duvarının 5000 portuna izin
 vermesi gerekir.
+
+### Release imzalama
+
+Release derlemesi `mobile/android/key.properties` dosyasındaki imza bilgilerini kullanır.
+Bu dosya anahtar şifrelerini içerdiği için depoya gönderilmez; şablonu
+`mobile/android/key.properties.example` dosyasındadır.
+
+Kendi anahtarınızı üretmek için:
+
+```bash
+keytool -genkeypair -v -keystore ~/lafla-release.jks -storetype PKCS12 \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias lafla
+```
+
+Sonra şablonu kopyalayıp değerleri doldurun:
+
+```bash
+cp mobile/android/key.properties.example mobile/android/key.properties
+```
+
+`key.properties` yoksa release derlemesi debug anahtarıyla imzalanır, yani projeyi
+klonlayan biri anahtar olmadan da çalışır bir APK üretebilir.
+
+İmzayı doğrulamak için:
+
+```bash
+apksigner verify --print-certs mobile/build/app/outputs/flutter-apk/app-release.apk
+```
 
 ## Örnek kullanıcılar
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'core/config/app_config.dart';
 import 'core/config/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/providers/auth_provider.dart';
@@ -13,6 +14,9 @@ void main() async {
 
   // Turkce tarih formatlari icin
   await initializeDateFormatting('tr', null);
+
+  // Kayitli sunucu adresi, ilk istek atilmadan once yuklenmeli
+  await AppConfig.yukle();
 
   runApp(const ProviderScope(child: ChatApp()));
 }

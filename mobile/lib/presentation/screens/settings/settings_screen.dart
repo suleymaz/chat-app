@@ -6,6 +6,7 @@ import '../../../core/config/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/baglanti_seridi.dart';
+import '../../widgets/sunucu_adresi_diyalogu.dart';
 
 // Bildirim onizleme secenekleri - sunucudaki enum ile birebir ayni
 const _onizlemeSecenekleri = {
@@ -129,6 +130,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () => context.push(Rotalar.blocked),
               ),
               const Divider(height: 1),
+
+              _baslik('Sunucu'),
+              // Adres burada yazmiyor; yalnizca dokunulunca acilan diyalogda
+              // goruluyor. Ekran goruntusu ya da ekran paylasimi sirasinda
+              // sunucunun adresi bos yere gorunmesin.
+              ListTile(
+                leading: const Icon(Icons.dns_outlined, color: AppColors.textSecondary),
+                title: const Text('Sunucu adresi'),
+                subtitle: const Text('Bağlanılacak sunucuyu değiştir'),
+                trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                onTap: () async {
+                  final degisti = await SunucuAdresiDiyalogu.ac(context);
+                  if (degisti && mounted) setState(() {});
+                },
+              ),
 
               _baslik('Hesap'),
               ListTile(

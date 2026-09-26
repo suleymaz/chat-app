@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/hata_kutusu.dart';
+import '../../widgets/sunucu_adresi_diyalogu.dart';
 import 'package:dio/dio.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -153,12 +154,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 8),
+                    _sunucuAdresiSatiri(),
                   ],
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Sunucu adresi giris ekranindan degistirilebiliyor: adres derlemeye
+  /// gomulu olsaydi, uygulamayi baska bir agda calistiran kisinin yeniden
+  /// derlemesi gerekirdi.
+  ///
+  /// Adresin kendisi burada yazmiyor; giris ekrani oturum acmamis herkese
+  /// aciktir ve sunucunun nerede oldugunu bos yere gostermeye gerek yok.
+  /// Adres yalnizca dokunulunca acilan diyalogda goruluyor.
+  Widget _sunucuAdresiSatiri() {
+    return Center(
+      child: TextButton.icon(
+        onPressed: _yukleniyor
+            ? null
+            : () async {
+                final degisti = await SunucuAdresiDiyalogu.ac(context);
+                if (degisti && mounted) setState(() => _genelHata = null);
+              },
+        icon: const Icon(Icons.dns_outlined, size: 16),
+        label: const Text('Sunucu ayarları', style: TextStyle(fontSize: 12)),
+        style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
       ),
     );
   }

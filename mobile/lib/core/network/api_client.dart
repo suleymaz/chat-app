@@ -36,6 +36,12 @@ class ApiClient {
     );
   }
 
+  /// Sunucu adresi uygulama icinden degistirildiginde cagrilir.
+  /// dio adresi kurulumda bir kez aldigi icin elle guncellenmesi gerekiyor.
+  void adresYenile() {
+    dio.options.baseUrl = AppConfig.apiUrl;
+  }
+
   Future<void> _istekOncesi(RequestOptions options, RequestInterceptorHandler handler) async {
     // Refresh ve login isteklerine token eklenmez
     final tokensiz = options.path.contains('/auth/refresh') ||

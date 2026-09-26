@@ -10,14 +10,13 @@ flutter pub get
 flutter run
 ```
 
-**Sunucu adresi derleme anında gömülür.** Varsayılan değer Android emülatörü içindir
-(`10.0.2.2:5000`). Gerçek bir cihazda çalıştırırken bilgisayarınızın yerel ağ adresini
-vermeniz gerekir:
+**Sunucu adresi uygulama içinden ayarlanır.** Giriş ekranının altındaki "Sunucu"
+düğmesinden sunucunun yerel ağ adresini yazın; adres cihazda saklanır. Varsayılan
+adres Android emülatörü içindir (`10.0.2.2:5000`) ve istenirse derleme anında
+değiştirilebilir:
 
 ```bash
-flutter run \
-  --dart-define=API_URL=http://192.168.1.20:5000/api/v1 \
-  --dart-define=SOCKET_URL=http://192.168.1.20:5000
+flutter run --dart-define=API_URL=http://192.168.1.20:5000/api/v1
 ```
 
 ## Testler

@@ -50,6 +50,43 @@ void main() {
     });
   });
 
+  group('sunucu adresi duzeltme', () {
+    // Adres kullanici tarafindan elle yaziliyor; eksik yazimlar tamamlanmali
+    test('sema yoksa http eklenir', () {
+      expect(AppConfig.adresDuzelt('192.168.1.5:5000'), 'http://192.168.1.5:5000');
+    });
+
+    test('port yoksa 5000 eklenir', () {
+      expect(AppConfig.adresDuzelt('192.168.1.5'), 'http://192.168.1.5:5000');
+    });
+
+    test('yanlislikla yazilan api yolu temizlenir', () {
+      expect(
+        AppConfig.adresDuzelt('http://192.168.1.5:5000/api/v1'),
+        'http://192.168.1.5:5000',
+      );
+    });
+
+    test('sondaki egik cizgi ve bosluklar atilir', () {
+      expect(AppConfig.adresDuzelt('  192.168.1.5:5000/  '), 'http://192.168.1.5:5000');
+    });
+
+    test('https korunur', () {
+      expect(AppConfig.adresDuzelt('https://sunucu.example.com'),
+          'https://sunucu.example.com:5000');
+    });
+
+    test('bos adres ve gecersiz giris reddedilir', () {
+      expect(AppConfig.adresHatasi(''), isNotNull);
+      expect(AppConfig.adresHatasi('   '), isNotNull);
+    });
+
+    test('gecerli adres kabul edilir', () {
+      expect(AppConfig.adresHatasi('192.168.1.5'), isNull);
+      expect(AppConfig.adresHatasi('http://10.0.2.2:5000'), isNull);
+    });
+  });
+
   group('socket adresi', () {
     // SOCKET_URL verilmediginde API adresinden turetiliyor: iki adresi ayri
     // ayri yazmak, birinde yazim hatasi olunca HTTP calisirken socket'in

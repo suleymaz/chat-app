@@ -10,6 +10,7 @@ Staj projesi olarak geliştirilmiştir.
 ## İçindekiler
 
 - [Projenin amacı](#projenin-amacı)
+- [Ekran görüntüleri](#ekran-görüntüleri)
 - [Özellikler](#özellikler)
 - [Kullanılan teknolojiler](#kullanılan-teknolojiler)
 - [Proje yapısı](#proje-yapısı)
@@ -37,6 +38,16 @@ mesajlaşma uygulaması geliştirmek.
 
 Uygulama yalnızca arayüz olarak değil, gerçek bir backend ve veritabanıyla çalışan
 uçtan uca bir sistem olarak kurgulanmıştır.
+
+## Ekran görüntüleri
+
+| Giriş | Kayıt | Sohbet listesi |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-giris.jpg" width="240" alt="Giriş ekranı"> | <img src="docs/screenshots/02-kayit.jpg" width="240" alt="Kayıt ekranı"> | <img src="docs/screenshots/03-sohbet-listesi.jpg" width="240" alt="Sohbet listesi"> |
+| **Mesajlaşma** | **Mesaj arama** | **Kişi bilgileri** |
+| <img src="docs/screenshots/04-mesajlasma.jpg" width="240" alt="Mesajlaşma ekranı"> | <img src="docs/screenshots/08-mesaj-arama.jpg" width="240" alt="Sohbet içinde mesaj arama"> | <img src="docs/screenshots/09-kisi-bilgileri.jpg" width="240" alt="Kişi bilgileri kartı"> |
+| **Kullanıcı arama** | **Profil** | **Ayarlar** |
+| <img src="docs/screenshots/05-kullanici-arama.jpg" width="240" alt="Kullanıcı arama"> | <img src="docs/screenshots/06-profil.jpg" width="240" alt="Profil ekranı"> | <img src="docs/screenshots/07-ayarlar.jpg" width="240" alt="Ayarlar ekranı"> |
 
 ## Özellikler
 

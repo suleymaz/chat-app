@@ -5,10 +5,17 @@ class AppConfig {
     defaultValue: 'http://10.0.2.2:5000/api/v1',
   );
 
-  static const String socketUrl = String.fromEnvironment(
-    'SOCKET_URL',
-    defaultValue: 'http://10.0.2.2:5000',
-  );
+  static const String _socketUrlTanimi = String.fromEnvironment('SOCKET_URL');
+
+  /// Socket adresi. Verilmediyse API adresinden türetilir.
+  ///
+  /// Önceden ayrı bir varsayılanı vardı ve iki adresi elle ayrı ayrı yazmak
+  /// gerekiyordu. Birinde yazım hatası yapıldığında HTTP çalışmaya devam
+  /// ettiği için hata gizli kalıyor, yalnızca socket sessizce bağlanamıyordu;
+  /// bir derlemede SOCKET_URL'e fazladan bir hane yazılması tam olarak buna
+  /// yol açtı. Artık tek bir API_URL vermek yetiyor.
+  static String get socketUrl =>
+      _socketUrlTanimi.isEmpty ? sunucuKoku : _socketUrlTanimi;
 
   /// Sunucu gorsel ve dosya adreslerini goreli donuyor (/uploads/...).
   /// Tam adres burada birlestiriliyor, boylece sunucunun adresi degistiginde

@@ -50,6 +50,20 @@ void main() {
     });
   });
 
+  group('socket adresi', () {
+    // SOCKET_URL verilmediginde API adresinden turetiliyor: iki adresi ayri
+    // ayri yazmak, birinde yazim hatasi olunca HTTP calisirken socket'in
+    // sessizce baglanamamasina yol aciyordu.
+    test('API adresinden turetiliyor ve surum onekini tasimiyor', () {
+      expect(AppConfig.socketUrl, AppConfig.sunucuKoku);
+      expect(AppConfig.socketUrl.contains('/api/v'), isFalse);
+    });
+
+    test('API adresiyle ayni sunucuyu gosteriyor', () {
+      expect(AppConfig.apiUrl.startsWith(AppConfig.socketUrl), isTrue);
+    });
+  });
+
   group('mesaj durumu', () {
     test('okundu, iletildi ve gonderildi sirasiyla belirlenir', () {
       expect(mesaj(readAt: DateTime.now(), deliveredAt: DateTime.now()).durum,
